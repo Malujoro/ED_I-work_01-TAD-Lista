@@ -3,9 +3,6 @@
 #include <stdlib.h>
 
 // TODO Criar função de se comunicar com python
-// Criar função de Ler imagem (Txt) (RGB e Gray)
-// Criar função de Ler imagem (png) (RGB e Gray)
-// TODO Criar função de Salvar imagem (Txt e Gerar imagem) (RGB e Gray)
 
 /* FUNÇÃO "Teste" da comunicação com python
 int main()
@@ -20,11 +17,12 @@ int main()
     char saida[] = "pasta/saida.png";
 
     snprintf(comando, tam, "python3 utils/image_utils.py %d %d %s %s", tipo, cor, origem, saida);
+    snprintf(caminho, tam, "imagens/numero da execução");
+    snprintf(caminho, tam, "imagens/%d", global);
 
     printf("%s", comando);
     return 0;
 }
-    return largura * i + j;
 */
 
 //////////////////// Funções auxiliares ////////////////////
@@ -32,75 +30,221 @@ int main()
 // Função para converter uma posição de matriz em posição de vetor
 int posicaoVetor(int largura, int i, int j)
 {
-
+    return largura * i + j;
 }
 
+FILE *lerArquivo(char *caminho, char *modo)
+{
+    FILE *arquivo = fopen(caminho, modo);
+
+    if(!arquivo)
+    {
+        prinf("Erro ao abrir o arquivo");
+        exit(EXIT_FAILURE);
+    }
+
+    return arquivo;
+}
+
+char *alocarStr(int tam)
+{
+    char *vetor = (char *) malloc(tam * sizeof(char));
+
+    if(!vetor)
+    {
+        printf("Erro ao alocar string");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
+}
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam)
 {
+    PixelRGB *vetor = (PixelRGB *) malloc(tam * sizeof(PixelRGB));
 
+    if(!vetor)
+    {
+        printf("Erro ao alocar pixel RGB");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
 }
 
 PixelGray *alocarPixelGray(int tam)
 {
+    PixelGray *vetor = (PixelGray *) malloc(tam * sizeof(PixelGray));
 
+    if(!vetor)
+    {
+        printf("Erro ao alocar pixel Gray");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
 }
 
 
+void liberarVetor(void **vetor)
+{
+    free(*vetor);
+    *vetor = NULL;
+}
+
+char *gerarCaminho(char *pasta, char *nome)
+{
+    int tamanho = 128;
+    char caminho = alocarStr(tamanho);
+
+    snprintf(caminho, tamanho, "%s/%s", pasta, nome);
+
+    return caminho;
+}
+
 ////////////// Funções de criação e liberação //////////////
+
+// Funções para criar a variável de imagem
 ImageGray *create_image_gray(int largura, int altura)
 {
+    ImageGray *imagem = (ImageGray *) malloc(sizeof(ImageGray));
 
+    if(!imagem)
+    {
+        printf("Erro ao alocar imagem Gray");
+        exit(EXIT_FAILURE);
+    }
+
+    imagem->dim.altura = altura;
+    imagem->dim.largura = largura;
+    imagem->pixels = alocarPixelGray(largura * altura);
+
+    return imagem;
 }
 
 void free_image_gray(ImageGray *image)
 {
-
+    liberarVetor(&image->pixels);
+    image->dim.altura = 0;
+    image->dim.largura = 0;
+    liberarVetor(&image);
 }
 
 
 ImageRGB *create_image_rgb(int largura, int altura)
 {
+    ImageRGB *imagem = (ImageRGB *) malloc(sizeof(ImageRGB));
 
+    if(!imagem)
+    {
+        printf("Erro ao alocar imagem RGB");
+        exit(EXIT_FAILURE);
+    }
+
+    imagem->dim.altura = altura;
+    imagem->dim.largura = largura;
+    imagem->pixels = alocarPixelRGB(largura * altura);
+
+    return imagem;
 }
 
 void free_image_rgb(ImageRGB *image)
 {
-
+    liberarVetor(&image->pixels);
+    image->dim.altura = 0;
+    image->dim.largura = 0;
+    liberarVetor(&image);
 }
 
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *LerImagemGray(char *caminho)
+ImageGray *lerTxtGray(char *caminho)
+{
+    FILE *arquivo = lerArquivo(caminho, "r");
+    
+    int altura, largura;
+    fscanf(arquivo, "%d", &altura);
+    fgetc(arquivo);
+    fscanf(arquivo, "%d", &largura);
+    fgetc(arquivo);
+
+    ImageGray *imagem = create_image_gray(largura, altura);
+
+    for(int i = 0; i < altura; i++)
+    {
+        for(int j = 0; j < largura; j++)
+        {
+            fscanf(arquivo, "%d", &imagem->pixels[posicaoVetor(largura, i, j)]);
+            fgetc(arquivo);
+        }
+        fgetc(arquivo);
+    }
+
+    fclose(arquivo);
+    return imagem;
+}
+
+ImageRGB *lerTxtRGB(char *caminho)
 {
 
 }
 
-ImageRGB *LerImagemRGB(char *caminho)
+
+// Falta completar
+ImageGray *lerImagemGray(char *caminho)
+{
+    // Utilizar a função txt from image gray
+
+    return lerTxtGray(caminho);
+}
+
+ImageRGB *lerImagemRGB(char *caminho)
 {
 
 }
 
 
-void *SalvarTxtGray(ImageGray *imagem)
+// Falta completar
+void *salvarTxtGray(ImageGray *imagem, char *caminho)
+{
+    // Criar pasta / modificar o caminho??
+    FILE *arquivo = lerArquivo(caminho, "w");
+
+    fscanf(arquivo, "%d,", &imagem->dim.altura);
+    fputc(arquivo, '\n');
+    fscanf(arquivo, "%d,", &imagem->dim.largura);
+    fputc(arquivo, '\n');
+
+    for(int i = 0; i < imagem->dim.altura; i++)
+    {
+        for(int j = 0; j < imagem->dim.largura; j++)
+        {
+            fprintf(arquivo, "%d,", imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)]);
+            fputc(arquivo, '\n');
+        }
+        fputc(arquivo, '\n');
+    }
+
+    fclose(arquivo);
+}
+
+void *salvarTxtRGB(ImageRGB *imagem)
 {
 
 }
 
-void *SalvarTxtRGB(ImageRGB *imagem)
-{
 
+// Falta completar
+void *salvarImagemGray(ImageGray *imagem, char *caminho)
+{
+    salvarTxtGray(imagem, caminho);
+
+    // Utilizar a função image gray from txt
 }
 
-
-void *SalvarImagemGray(ImageGray *imagem)
-{
-
-}
-
-void *SalvarImagemRGB(ImageRGB *imagem)
+void *salvarImagemRGB(ImageRGB *imagem)
 {
 
 }
