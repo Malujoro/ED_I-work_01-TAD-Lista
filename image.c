@@ -2,6 +2,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO Criar função de cálculo de posição
+// TODO Criar função de se comunicar com python
+// TODO Criar função de Salvar imagem (RGB e Gray)
+
+/* FUNÇÃO "Teste" da comunicação com python
+int main()
+{
+    int tam = 128;
+    char comando[tam];
+
+    int tipo, cor;
+    tipo = 1;
+    cor = 1;
+    char origem[] = "imagem.txt";
+    char saida[] = "pasta/saida.png";
+
+    snprintf(comando, tam, "python3 utils/image_utils.py %d %d %s %s", tipo, cor, origem, saida);
+
+    printf("%s", comando);
+    return 0;
+}
+*/
+
+
 // Funções de criação e liberação
 ImageGray *create_image_gray(int largura, int altura)
 {
