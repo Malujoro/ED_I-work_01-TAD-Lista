@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #ifndef IMAGE_H
 #define IMAGE_H
 
@@ -23,12 +26,37 @@ typedef struct imageRGB {
     PixelRGB *pixels;
 } ImageRGB;
 
-// Funções de criação e liberação
+//////////////////// Funções auxiliares ////////////////////
+
+// Função para converter uma posição de matriz em posição de vetor
+int posicaoVetor(int largura, int i, int j);
+
+// Funções para alocar um vetor de pixels
+PixelRGB *alocarPixelRGB(int tam);
+PixelGray *alocarPixelGray(int tam);
+
+
+////////////// Funções de criação e liberação //////////////
 ImageGray *create_image_gray(int largura, int altura);
 void free_image_gray(ImageGray *image);
 
 ImageRGB *create_image_rgb(int largura, int altura);
 void free_image_rgb(ImageRGB *image);
+
+
+////////////// Funções para leitura e salvamento //////////////
+
+ImageGray *LerImagemGray(char *caminho);
+ImageRGB *LerImagemRGB(char *caminho);
+
+void *SalvarTxtGray(ImageGray *imagem);
+void *SalvarTxtRGB(ImageRGB *imagem);
+
+void *SalvarImagemGray(ImageGray *imagem);
+void *SalvarImagemRGB(ImageRGB *imagem);
+
+
+////////////////// Funções para Operações //////////////////
 
 // Operações para ImageGray
 ImageGray *flip_vertical_gray(ImageGray *image);
@@ -40,6 +68,9 @@ ImageRGB *flip_vertical_rgb(const ImageRGB *image);
 ImageRGB *flip_horizontal_rgb(const ImageRGB *image);
 ImageRGB *transpose_rgb(const ImageRGB *image);
 
+
+///////////// Funções de Manipulação por Pixel /////////////
+
 // Manipulação por pixel para ImageGray
 ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height);
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size);
@@ -47,5 +78,7 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size);
 // Manipulação por pixel para ImageRGB
 ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height);
 ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size);
+
+////////////////////////////////////////////////////////////
 
 #endif // IMAGE_H

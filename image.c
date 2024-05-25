@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO Criar função de cálculo de posição
 // TODO Criar função de se comunicar com python
-// TODO Criar função de Salvar imagem (RGB e Gray)
+// Criar função de Ler imagem (Txt) (RGB e Gray)
+// Criar função de Ler imagem (png) (RGB e Gray)
+// TODO Criar função de Salvar imagem (Txt e Gerar imagem) (RGB e Gray)
 
 /* FUNÇÃO "Teste" da comunicação com python
 int main()
@@ -23,10 +24,31 @@ int main()
     printf("%s", comando);
     return 0;
 }
+    return largura * i + j;
 */
 
+//////////////////// Funções auxiliares ////////////////////
 
-// Funções de criação e liberação
+// Função para converter uma posição de matriz em posição de vetor
+int posicaoVetor(int largura, int i, int j)
+{
+
+}
+
+
+// Funções para alocar um vetor de pixels
+PixelRGB *alocarPixelRGB(int tam)
+{
+
+}
+
+PixelGray *alocarPixelGray(int tam)
+{
+
+}
+
+
+////////////// Funções de criação e liberação //////////////
 ImageGray *create_image_gray(int largura, int altura)
 {
 
@@ -48,6 +70,43 @@ void free_image_rgb(ImageRGB *image)
 
 }
 
+
+////////////// Funções para leitura e salvamento //////////////
+
+ImageGray *LerImagemGray(char *caminho)
+{
+
+}
+
+ImageRGB *LerImagemRGB(char *caminho)
+{
+
+}
+
+
+void *SalvarTxtGray(ImageGray *imagem)
+{
+
+}
+
+void *SalvarTxtRGB(ImageRGB *imagem)
+{
+
+}
+
+
+void *SalvarImagemGray(ImageGray *imagem)
+{
+
+}
+
+void *SalvarImagemRGB(ImageRGB *imagem)
+{
+
+}
+
+
+////////////////// Funções para Operações //////////////////
 
 // Operações para ImageGray
 ImageGray *flip_vertical_gray(ImageGray *image)
@@ -83,6 +142,8 @@ ImageRGB *transpose_rgb(const ImageRGB *image)
 }
 
 
+///////////// Funções de Manipulação por Pixel /////////////
+
 // Manipulação por pixel para ImageGray
 ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 {
@@ -103,6 +164,7 @@ ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
 
 ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
 {
- 
-    
+
 }
+
+////////////////////////////////////////////////////////////
