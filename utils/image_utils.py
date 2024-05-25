@@ -1,5 +1,6 @@
 from PIL import Image
 
+## Gera um txt a partir de alguma image, Cinza ou RGB
 def txt_from_image_gray(image_path, output_path, gray=True):
     img = Image.open(image_path)
 
@@ -18,6 +19,7 @@ def txt_from_image_gray(image_path, output_path, gray=True):
                 file.write(f"{pixel},")
             file.write("\n")
 
+## Gera uma imagem Gray a partir de um txt
 def image_gray_from_txt(txt_path, output_path):
     with open(txt_path, 'r') as file:
         lines = file.readlines()
@@ -35,7 +37,7 @@ def image_gray_from_txt(txt_path, output_path):
         # Salva a imagem resultante
         nova_imagem.save(output_path)
 
-
+## Gera uma imagem RGB a partir de um txt
 def image_rgb_from_txt(txt_path, output_path):
     with open(txt_path, 'r') as file:
         lines = file.readlines()
@@ -52,3 +54,9 @@ def image_rgb_from_txt(txt_path, output_path):
 
         # Salva a imagem resultante
         nova_imagem.save(output_path)
+
+
+# txt_from_image_gray("utils/lena.png", "utils/output/teste.txt", False)
+
+# image_gray_from_txt("utils/input_image_example_Gray.txt", "utils/output/testeGray.png")
+# image_rgb_from_txt("utils/input_image_example_RGB.txt", "utils/output/testeRGB.png")
