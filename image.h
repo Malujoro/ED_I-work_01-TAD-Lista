@@ -1,8 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #ifndef IMAGE_H
 #define IMAGE_H
+
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct dimensoes {
     int altura, largura;
@@ -31,10 +31,17 @@ typedef struct imageRGB {
 // Função para converter uma posição de matriz em posição de vetor
 int posicaoVetor(int largura, int i, int j);
 
+FILE *lerArquivo(char *caminho, char *modo);
+
+char *alocarStr(int tam);
+
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
 PixelGray *alocarPixelGray(int tam);
 
+void liberarVetor(void **vetor);
+
+char *gerarCaminho(char *pasta, char *nome);
 
 ////////////// Funções de criação e liberação //////////////
 ImageGray *create_image_gray(int largura, int altura);
@@ -46,14 +53,17 @@ void free_image_rgb(ImageRGB *image);
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *LerImagemGray(char *caminho);
-ImageRGB *LerImagemRGB(char *caminho);
+ImageGray *lerTxtGray(char *caminho);
+ImageRGB *lerTxtRGB(char *caminho);
 
-void *SalvarTxtGray(ImageGray *imagem);
-void *SalvarTxtRGB(ImageRGB *imagem);
+ImageGray *lerImagemGray(char *caminho);
+ImageRGB *lerImagemRGB(char *caminho);
 
-void *SalvarImagemGray(ImageGray *imagem);
-void *SalvarImagemRGB(ImageRGB *imagem);
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarTxtRGB(ImageRGB *imagem);
+
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarImagemRGB(ImageRGB *imagem);
 
 
 ////////////////// Funções para Operações //////////////////
