@@ -59,11 +59,11 @@ ImageRGB *lerTxtRGB(char *caminho);
 ImageGray *lerImagemGray(char *caminho);
 ImageRGB *lerImagemRGB(char *caminho);
 
-void *salvarTxtGray(ImageGray *imagem, char *caminho);
-void *salvarTxtRGB(ImageRGB *imagem);
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarTxtRGB(ImageRGB *imagem);
 
-void *salvarImagemGray(ImageGray *imagem, char *caminho);
-void *salvarImagemRGB(ImageRGB *imagem);
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarImagemRGB(ImageRGB *imagem);
 
 
 ////////////////// Funções para Operações //////////////////

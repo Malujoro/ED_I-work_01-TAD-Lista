@@ -1,8 +1,12 @@
 #include "image.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h> // Biblioteca para verificar pastas
+#include <sys/stat.h> // Biblioteca para criar pastas
+#include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 
 // TODO Criar função de se comunicar com python
+// TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
 /* FUNÇÃO "Teste" da comunicação com python
 int main()
@@ -103,6 +107,15 @@ char *gerarCaminho(char *pasta, char *nome)
     return caminho;
 }
 
+void criarPasta(char *caminho)
+{
+    if (mkdir(caminho, 0755) != 0)
+    {
+        printf("Erro ao criar pasta");
+        exit(EXIT_FAILURE);
+    }
+}
+
 ////////////// Funções de criação e liberação //////////////
 
 // Funções para criar a variável de imagem
@@ -192,7 +205,7 @@ ImageRGB *lerTxtRGB(char *caminho)
 }
 
 
-// Falta completar
+// Falta completar [Python]
 ImageGray *lerImagemGray(char *caminho)
 {
     // Utilizar a função txt from image gray
@@ -206,15 +219,22 @@ ImageRGB *lerImagemRGB(char *caminho)
 }
 
 
-// Falta completar
-void *salvarTxtGray(ImageGray *imagem, char *caminho)
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
 {
-    // Criar pasta / modificar o caminho??
+    DIR *pasta = opendir(caminho);
+
+    if(pasta)
+        closedir(pasta);
+    else
+        criarPasta(caminho);
+
+    caminho = gerarCaminho(caminho, nome);
+
     FILE *arquivo = lerArquivo(caminho, "w");
 
-    fscanf(arquivo, "%d,", &imagem->dim.altura);
+    fprintf(arquivo, "%d,", imagem->dim.altura);
     fputc(arquivo, '\n');
-    fscanf(arquivo, "%d,", &imagem->dim.largura);
+    fprintf(arquivo, "%d,", imagem->dim.largura);
     fputc(arquivo, '\n');
 
     for(int i = 0; i < imagem->dim.altura; i++)
@@ -227,24 +247,31 @@ void *salvarTxtGray(ImageGray *imagem, char *caminho)
         fputc(arquivo, '\n');
     }
 
+    liberarVetor(&caminho);
     fclose(arquivo);
 }
 
-void *salvarTxtRGB(ImageRGB *imagem)
+// 
+void salvarTxtRGB(ImageRGB *imagem)
 {
 
 }
 
 
-// Falta completar
-void *salvarImagemGray(ImageGray *imagem, char *caminho)
+// Falta completar [Python]
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 {
-    salvarTxtGray(imagem, caminho);
+    salvarTxtGray(imagem, caminho, nome);
 
+    caminho = gerarCaminho(caminho, nome);
+    
     // Utilizar a função image gray from txt
+
+    liberarVetor(&caminho);
 }
 
-void *salvarImagemRGB(ImageRGB *imagem)
+// 
+void salvarImagemRGB(ImageRGB *imagem)
 {
 
 }
