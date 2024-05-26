@@ -111,7 +111,7 @@ void *SalvarImagemRGB(ImageRGB *imagem)
 // Operações para ImageGray
 ImageGray *flip_vertical_gray(ImageGray *image)
 {
-
+    //TESTE 2
 }
 
 ImageGray *flip_horizontal_gray(ImageGray *image)
