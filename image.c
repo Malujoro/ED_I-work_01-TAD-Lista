@@ -65,7 +65,7 @@ char *alocarStr(int tam)
 
 int *alocarInt(int tam)
 {
-    int *vetor = (int *) malloc(tam * sizeof(int));
+    int *vetor = (int *) calloc(tam, sizeof(int));
 
     if(!vetor)
     {
@@ -127,7 +127,7 @@ void criarPasta(char *caminho)
     }
 }
 
-int mediana(int *vetor, int tam)
+int mediana2(int *vetor, int tam)
 {
     int aux, menor, pos;
     for(int i = 0; i <= tam/2; i++)
@@ -147,6 +147,26 @@ int mediana(int *vetor, int tam)
         vetor[i] = aux;
     }
     return vetor[tam/2];
+}
+
+int mediana(int *vetor, int tam)
+{
+    int *gray = alocarInt(256);
+
+    for(int i = 0; i < tam; i++)
+        gray[vetor[i]]++;
+
+    // 5 * 5 = 25
+    // 25 / 2 = 12
+    for(int i = 0, valor = 0; i < 256; i++)
+    {
+        valor += gray[i];
+        if(valor >= tam/2)
+            return i;
+    }
+
+    liberarVetor(&gray);
+    return 0;
 }
 
 ////////////// Funções de criação e liberação //////////////
