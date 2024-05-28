@@ -43,7 +43,7 @@ FILE *lerArquivo(char *caminho, char *modo)
 
     if(!arquivo)
     {
-        prinf("Erro ao abrir o arquivo");
+        printf("Erro ao abrir o arquivo");
         exit(EXIT_FAILURE);
     }
 
@@ -63,7 +63,19 @@ char *alocarStr(int tam)
     return vetor;
 }
 
-// Funções para alocar um vetor de pixels
+int *alocarInt(int tam)
+{
+    int *vetor = (int *) malloc(tam * sizeof(int));
+
+    if(!vetor)
+    {
+        printf("Erro ao alocar inteiro");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
+}
+
 PixelRGB *alocarPixelRGB(int tam)
 {
     PixelRGB *vetor = (PixelRGB *) malloc(tam * sizeof(PixelRGB));
@@ -90,7 +102,6 @@ PixelGray *alocarPixelGray(int tam)
     return vetor;
 }
 
-
 void liberarVetor(void **vetor)
 {
     free(*vetor);
@@ -100,7 +111,7 @@ void liberarVetor(void **vetor)
 char *gerarCaminho(char *pasta, char *nome)
 {
     int tamanho = 128;
-    char caminho = alocarStr(tamanho);
+    char *caminho = alocarStr(tamanho);
 
     snprintf(caminho, tamanho, "%s/%s", pasta, nome);
 
@@ -114,6 +125,28 @@ void criarPasta(char *caminho)
         printf("Erro ao criar pasta");
         exit(EXIT_FAILURE);
     }
+}
+
+int mediana(int *vetor, int tam)
+{
+    int aux, menor, pos;
+    for(int i = 0; i <= tam/2; i++)
+    {
+        menor = vetor[i];
+        pos = i;
+        for(int j = i+1; j < tam; j++)
+        {
+            if(vetor[j] < menor)
+            {
+                menor = vetor[j];
+                pos = j;
+            }
+        }
+        aux = vetor[pos];
+        vetor[pos] = vetor[i];
+        vetor[i] = aux;
+    }
+    return vetor[tam/2];
 }
 
 ////////////// Funções de criação e liberação //////////////
@@ -189,7 +222,7 @@ ImageGray *lerTxtGray(char *caminho)
     {
         for(int j = 0; j < largura; j++)
         {
-            fscanf(arquivo, "%d", &imagem->pixels[posicaoVetor(largura, i, j)]);
+            fscanf(arquivo, "%d", &imagem->pixels[posicaoVetor(largura, i, j)].value);
             fgetc(arquivo);
         }
         fgetc(arquivo);
@@ -199,13 +232,14 @@ ImageGray *lerTxtGray(char *caminho)
     return imagem;
 }
 
-ImageRGB *lerTxtRGB(char *caminho)
-{
+// TODO RGB futuro
+// ImageRGB *lerTxtRGB(char *caminho)
+// {
 
-}
+// }
 
 
-// Falta completar [Python]
+// TODO Falta completar [Python]
 ImageGray *lerImagemGray(char *caminho)
 {
     // Utilizar a função txt from image gray
@@ -213,10 +247,11 @@ ImageGray *lerImagemGray(char *caminho)
     return lerTxtGray(caminho);
 }
 
-ImageRGB *lerImagemRGB(char *caminho)
-{
+// TODO RGB futuro
+// ImageRGB *lerImagemRGB(char *caminho)
+// {
 
-}
+// }
 
 
 void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
@@ -232,33 +267,32 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
 
     FILE *arquivo = lerArquivo(caminho, "w");
 
-    fprintf(arquivo, "%d,", imagem->dim.altura);
-    fputc(arquivo, '\n');
-    fprintf(arquivo, "%d,", imagem->dim.largura);
-    fputc(arquivo, '\n');
+    fprintf(arquivo, "%d", imagem->dim.altura);
+    fputc('\n', arquivo);
+    fprintf(arquivo, "%d", imagem->dim.largura);
+    fputc('\n', arquivo);
 
     for(int i = 0; i < imagem->dim.altura; i++)
     {
         for(int j = 0; j < imagem->dim.largura; j++)
         {
-            fprintf(arquivo, "%d,", imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)]);
-            fputc(arquivo, '\n');
+            fprintf(arquivo, "%d,", imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)].value);
         }
-        fputc(arquivo, '\n');
+        fputc('\n', arquivo);
     }
 
     liberarVetor(&caminho);
     fclose(arquivo);
 }
 
-// 
-void salvarTxtRGB(ImageRGB *imagem)
-{
+// TODO RGB futuro
+// void salvarTxtRGB(ImageRGB *imagem)
+// {
 
-}
+// }
 
 
-// Falta completar [Python]
+// TODO Falta completar [Python]
 void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 {
     salvarTxtGray(imagem, caminho, nome);
@@ -270,72 +304,106 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
     liberarVetor(&caminho);
 }
 
-// 
-void salvarImagemRGB(ImageRGB *imagem)
-{
+// TODO RGB futuro
+// void salvarImagemRGB(ImageRGB *imagem)
+// {
 
-}
+// }
 
 
 ////////////////// Funções para Operações //////////////////
 
-// Operações para ImageGray
-ImageGray *flip_vertical_gray(ImageGray *image)
-{
+// // Operações para ImageGray
+// ImageGray *flip_vertical_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *flip_horizontal_gray(ImageGray *image)
-{
+// ImageGray *flip_horizontal_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *transpose_gray(const ImageGray *image)
-{
+// ImageGray *transpose_gray(const ImageGray *image)
+// {
 
-}
+// }
 
 
-// Operações para ImageRGB
-ImageRGB *flip_vertical_rgb(const ImageRGB *image)
-{
+// // Operações para ImageRGB
+// ImageRGB *flip_vertical_rgb(const ImageRGB *image)
+// {
 
-}
+// }
 
-ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
-{
+// ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
+// {
 
-}
+// }
 
-ImageRGB *transpose_rgb(const ImageRGB *image)
-{
+// ImageRGB *transpose_rgb(const ImageRGB *image)
+// {
 
-}
+// }
 
 
 ///////////// Funções de Manipulação por Pixel /////////////
 
 // Manipulação por pixel para ImageGray
-ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
-{
-
-}
+// ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
+// {
+    // int quantY = image->dim.altura / kernel_size;
+    // int quantX = image->dim.largura / kernel_size;
+// }
 
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
 {
+    if(kernel_size % 2 == 0)
+    {
+        printf("Kernel size deve ser ímpar");
+        return NULL;
+    }
 
+    ImageGray *blur = create_image_gray(image->dim.largura, image->dim.altura);
+    for(int i = 0; i < image->dim.largura * image->dim.altura; i++)
+        blur->pixels[i].value = image->pixels[i].value;
+
+    int tam = kernel_size / 2, quant, meio;
+    int quantY = image->dim.altura - (tam * 2);
+    int quantX = image->dim.largura - (tam * 2);
+    int *vetor = alocarInt(kernel_size * kernel_size);
+    printf("\n[%d]\n", quantY * quantX);
+    for(int i = 0; i < quantY; i++)
+    {
+        for(int j = 0; j < quantX; j++)
+        {
+            quant = 0;
+            meio = posicaoVetor(image->dim.largura, tam + i, tam + j);
+            for(int i2 = 0; i2 < kernel_size; i2++)
+            {
+                for(int j2 = 0; j2 < kernel_size; j2++)
+                {
+                    vetor[quant] = image->pixels[posicaoVetor(image->dim.largura, i2 + i, j2 + j)].value;
+                    quant++;
+                }
+            }
+            blur->pixels[meio].value = mediana(vetor, quant);
+        }
+    }
+
+    return blur;
 }
 
 
-// Manipulação por pixel para ImageRGB
-ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
-{
+// // Manipulação por pixel para ImageRGB
+// ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
+// {
 
-}
+// }
 
-ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
-{
+// ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
+// {
 
-}
+// }
 
 ////////////////////////////////////////////////////////////

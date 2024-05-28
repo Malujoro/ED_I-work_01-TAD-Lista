@@ -34,6 +34,7 @@ int posicaoVetor(int largura, int i, int j);
 FILE *lerArquivo(char *caminho, char *modo);
 
 char *alocarStr(int tam);
+int *alocarInt(int tam);
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
@@ -42,6 +43,10 @@ PixelGray *alocarPixelGray(int tam);
 void liberarVetor(void **vetor);
 
 char *gerarCaminho(char *pasta, char *nome);
+
+void criarPasta(char *caminho);
+
+int mediana(int *vetor, int tam);
 
 ////////////// Funções de criação e liberação //////////////
 ImageGray *create_image_gray(int largura, int altura);
