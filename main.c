@@ -5,20 +5,9 @@
 
 int main()
 {
-    ImageGray *imagem = lerImagemGray("utils/output/lena.txt");
-    imagem = median_blur_gray(imagem, 511);
-    salvarTxtGray(imagem, "utils/output", "blur511.txt");
-    // int tam = 128;
-    // char comando[tam];
+    ImageGray *imagem = lerImagemGray("imagens/lena.png", "imagens", "lena_blur");
+    imagem = median_blur_gray(imagem, 9);
+    salvarImagemGray(imagem, "imagens", "lena_blur");
 
-    // int tipo, cor;
-    // tipo = 1;
-    // cor = 1;
-    // char origem[] = "imagem.txt";
-    // char saida[] = "pasta/saida.png";
-
-    // snprintf(comando, tam, "python3 utils/image_utils.py %d %d %s %s", tipo, cor, origem, saida);
-
-    // printf("%s", comando);
     return 0;
 }

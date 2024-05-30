@@ -5,29 +5,10 @@
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 
+char *caminhoAtual;
+
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
-
-/* FUNÇÃO "Teste" da comunicação com python
-int main()
-{
-    int tam = 128;
-    char comando[tam];
-
-    int tipo, cor;
-    tipo = 1;
-    cor = 1;
-    char origem[] = "imagem.txt";
-    char saida[] = "pasta/saida.png";
-
-    snprintf(comando, tam, "python3 utils/image_utils.py %d %d %s %s", tipo, cor, origem, saida);
-    snprintf(caminho, tam, "imagens/numero da execução");
-    snprintf(caminho, tam, "imagens/%d", global);
-
-    printf("%s", comando);
-    return 0;
-}
-*/
 
 //////////////////// Funções auxiliares ////////////////////
 
@@ -102,18 +83,37 @@ PixelGray *alocarPixelGray(int tam)
     return vetor;
 }
 
-void liberarVetor(void **vetor)
+void *liberarVetor(void *vetor)
 {
-    free(*vetor);
-    *vetor = NULL;
+    free(vetor);
+    return NULL;
 }
 
-char *gerarCaminho(char *pasta, char *nome)
+// Função para converter um Inteiro em String
+char *intParaStr(int num)
+{
+    int tam, quant;
+    for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
+    printf("tam = [%d] | quant = [%d]\n", tam, quant);
+
+    char *result = alocarStr(quant);
+
+    for(int i = 0; i < quant; i++)
+    {
+        result[i] = '0' + num / tam;
+        num %= tam;
+        tam /= 10;
+    }
+
+    return result;
+}
+
+char *gerarCaminho(char *pasta, char *nome, char *tipo)
 {
     int tamanho = 128;
     char *caminho = alocarStr(tamanho);
 
-    snprintf(caminho, tamanho, "%s/%s", pasta, nome);
+    snprintf(caminho, tamanho, "%s%s%s", pasta, tipo, nome);
 
     return caminho;
 }
@@ -127,26 +127,41 @@ void criarPasta(char *caminho)
     }
 }
 
-int mediana2(int *vetor, int tam)
+int pastaExiste(char *caminho)
 {
-    int aux, menor, pos;
-    for(int i = 0; i <= tam/2; i++)
+    DIR *pasta = opendir(caminho);
+
+    if(pasta)
     {
-        menor = vetor[i];
-        pos = i;
-        for(int j = i+1; j < tam; j++)
-        {
-            if(vetor[j] < menor)
-            {
-                menor = vetor[j];
-                pos = j;
-            }
-        }
-        aux = vetor[pos];
-        vetor[pos] = vetor[i];
-        vetor[i] = aux;
+        closedir(pasta);
+        return 1;
     }
-    return vetor[tam/2];
+
+    criarPasta(caminho);
+    return 0;
+}
+
+int contarPastas(char *caminho)
+{
+    DIR *pasta = opendir(caminho);
+
+    if(!pasta)
+    {
+        printf("Erro ao abrir pasta");
+        exit(EXIT_FAILURE);
+    }
+
+    struct dirent *entrada = readdir(pasta);
+    int quant = -1;
+
+    while(entrada)
+    {
+        quant++;
+        entrada = readdir(pasta);
+    }
+
+    closedir(pasta);
+    return quant;
 }
 
 int mediana(int *vetor, int tam)
@@ -156,17 +171,36 @@ int mediana(int *vetor, int tam)
     for(int i = 0; i < tam; i++)
         gray[vetor[i]]++;
 
-    // 5 * 5 = 25
-    // 25 / 2 = 12
     for(int i = 0, valor = 0; i < 256; i++)
     {
         valor += gray[i];
         if(valor >= tam/2)
+        {
+            gray = liberarVetor(gray);
             return i;
+        }
     }
 
-    liberarVetor(&gray);
+    gray = liberarVetor(gray);
     return 0;
+}
+
+void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
+{
+    int tam = 256, quant = contarPastas(pasta);
+    char comando[tam];
+
+    if(tipo[0] == 't')
+        quant--;
+    
+    char *num = intParaStr(quant);
+    char *caminho = gerarCaminho(pasta, num, "/");
+    pastaExiste(caminho);
+    num = liberarVetor(num);
+
+    snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
+
+    system(comando);
 }
 
 ////////////// Funções de criação e liberação //////////////
@@ -191,10 +225,10 @@ ImageGray *create_image_gray(int largura, int altura)
 
 void free_image_gray(ImageGray *image)
 {
-    liberarVetor(&image->pixels);
+    image->pixels = liberarVetor(image->pixels);
     image->dim.altura = 0;
     image->dim.largura = 0;
-    liberarVetor(&image);
+    image = liberarVetor(image);
 }
 
 
@@ -217,17 +251,43 @@ ImageRGB *create_image_rgb(int largura, int altura)
 
 void free_image_rgb(ImageRGB *image)
 {
-    liberarVetor(&image->pixels);
+    image->pixels = liberarVetor(image->pixels);
     image->dim.altura = 0;
     image->dim.largura = 0;
-    liberarVetor(&image);
+    image = liberarVetor(image);
 }
 
 
+ImageGray *copiarImagemGray(const ImageGray *image)
+{
+    ImageGray *copia = create_image_gray(image->dim.largura, image->dim.altura);
+
+    for(int i = 0; i < image->dim.largura * image->dim.altura; i++)
+        copia->pixels[i].value = image->pixels[i].value;
+        
+    return copia;
+}
+
+ImageRGB *copiarImagemRGB(const ImageRGB *image)
+{
+    ImageRGB *copia = create_image_rgb(image->dim.largura, image->dim.altura);
+
+    for(int i = 0; i < image->dim.largura * image->dim.altura; i++)
+    {
+        copia->pixels[i].red = image->pixels[i].red;
+        copia->pixels[i].green = image->pixels[i].green;
+        copia->pixels[i].blue = image->pixels[i].blue;
+    }
+        
+    return copia;
+}
+
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *lerTxtGray(char *caminho)
+ImageGray *lerTxtGray(char *pasta, char *nome)
 {
+    char *caminho = gerarCaminho(pasta, nome, "/");
+    caminho = gerarCaminho(caminho, "txt", ".");
     FILE *arquivo = lerArquivo(caminho, "r");
     
     int altura, largura;
@@ -247,7 +307,6 @@ ImageGray *lerTxtGray(char *caminho)
         }
         fgetc(arquivo);
     }
-
     fclose(arquivo);
     return imagem;
 }
@@ -260,11 +319,12 @@ ImageGray *lerTxtGray(char *caminho)
 
 
 // TODO Falta completar [Python]
-ImageGray *lerImagemGray(char *caminho)
+ImageGray *lerImagemGray(char *origem, char *pasta, char *nome)
 {
     // Utilizar a função txt from image gray
+    python(origem, "png", "gray", pasta, nome, "txt");
 
-    return lerTxtGray(caminho);
+    return lerTxtGray(pasta, nome);
 }
 
 // TODO RGB futuro
@@ -276,15 +336,9 @@ ImageGray *lerImagemGray(char *caminho)
 
 void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
 {
-    DIR *pasta = opendir(caminho);
-
-    if(pasta)
-        closedir(pasta);
-    else
-        criarPasta(caminho);
-
-    caminho = gerarCaminho(caminho, nome);
-
+    pastaExiste(caminho);
+    caminho = gerarCaminho(caminho, nome, "/");
+    caminho = gerarCaminho(caminho, "txt", ".");
     FILE *arquivo = lerArquivo(caminho, "w");
 
     fprintf(arquivo, "%d", imagem->dim.altura);
@@ -301,7 +355,8 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
         fputc('\n', arquivo);
     }
 
-    liberarVetor(&caminho);
+    // caminho = liberarVetor(caminho);
+    caminhoAtual = caminho;
     fclose(arquivo);
 }
 
@@ -317,11 +372,9 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 {
     salvarTxtGray(imagem, caminho, nome);
 
-    caminho = gerarCaminho(caminho, nome);
-    
-    // Utilizar a função image gray from txt
+    python(caminhoAtual, "txt", "gray", caminho, nome, "png");
 
-    liberarVetor(&caminho);
+    // caminho = liberarVetor(caminho);
 }
 
 // TODO RGB futuro
@@ -384,36 +437,39 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
         return NULL;
     }
 
-    ImageGray *blur = create_image_gray(image->dim.largura, image->dim.altura);
-    for(int i = 0; i < image->dim.largura * image->dim.altura; i++)
-        blur->pixels[i].value = image->pixels[i].value;
+    ImageGray *blur = copiarImagemGray(image);
 
-    int tam = kernel_size / 2, quant, meio;
-    int quantY = image->dim.altura - (tam * 2);
-    int quantX = image->dim.largura - (tam * 2);
+    int tam = kernel_size / 2, meio, quant;
     int *vetor = alocarInt(kernel_size * kernel_size);
-    printf("\n[%d]\n", quantY * quantX);
-    for(int i = 0; i < quantY; i++)
+    for(int i = 0; i < image->dim.altura; i++)
     {
-        for(int j = 0; j < quantX; j++)
+        for(int j = 0; j < image->dim.largura; j++)
         {
             quant = 0;
-            meio = posicaoVetor(image->dim.largura, tam + i, tam + j);
-            for(int i2 = 0; i2 < kernel_size; i2++)
+            for(int i2 = 0, posY = i - tam; i2 < kernel_size; i2++, posY++)
             {
-                for(int j2 = 0; j2 < kernel_size; j2++)
+                if(posY < 0)
+                    posY += 512;
+                else if(posY >= 512)
+                    posY -= 512;
+
+                for(int j2 = 0, posX = j - tam; j2 < kernel_size; j2++, posX++, quant++)
                 {
-                    vetor[quant] = image->pixels[posicaoVetor(image->dim.largura, i2 + i, j2 + j)].value;
-                    quant++;
+                    if(posX < 0)
+                        posX += 512;
+                    else if(posX >= 512)
+                        posX -= 512;
+                        
+                    vetor[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].value;
                 }
             }
+            meio = posicaoVetor(image->dim.largura, i, j);
             blur->pixels[meio].value = mediana(vetor, quant);
         }
     }
 
     return blur;
 }
-
 
 // // Manipulação por pixel para ImageRGB
 // ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
