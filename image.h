@@ -34,14 +34,25 @@ int posicaoVetor(int largura, int i, int j);
 FILE *lerArquivo(char *caminho, char *modo);
 
 char *alocarStr(int tam);
+int *alocarInt(int tam);
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
 PixelGray *alocarPixelGray(int tam);
 
-void liberarVetor(void **vetor);
+void *liberarVetor(void *vetor);
 
-char *gerarCaminho(char *pasta, char *nome);
+char *intParaStr(int num);
+
+char *gerarCaminho(char *pasta, char *nome, char *tipo);
+
+void criarPasta(char *caminho);
+
+int contarPastas(char *caminho);
+
+int mediana(int *vetor, int tam);
+
+void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao);
 
 ////////////// Funções de criação e liberação //////////////
 ImageGray *create_image_gray(int largura, int altura);
@@ -50,14 +61,16 @@ void free_image_gray(ImageGray *image);
 ImageRGB *create_image_rgb(int largura, int altura);
 void free_image_rgb(ImageRGB *image);
 
+ImageGray *copiarImagemGray(const ImageGray *image);
+ImageRGB *copiarImagemRGB(const ImageRGB *image);
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *lerTxtGray(char *caminho);
-ImageRGB *lerTxtRGB(char *caminho);
+ImageGray *lerTxtGray(char *pasta, char *nome);
+ImageRGB *lerTxtRGB(char *pasta, char *nome);
 
-ImageGray *lerImagemGray(char *caminho);
-ImageRGB *lerImagemRGB(char *caminho);
+ImageGray *lerImagemGray(char *origem, char *pasta, char *nome);
+ImageRGB *lerImagemRGB(char *pasta, char *nome);
 
 void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome);
 void salvarTxtRGB(ImageRGB *imagem);
