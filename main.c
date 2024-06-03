@@ -5,9 +5,9 @@
 
 int main()
 {
-    ImageGray *imagem = lerImagemGray("imagens/lena.png", "imagens", "lena_blur");
+    ImageGray *imagem = lerTxtGray("imagens", "lena");
     imagem = median_blur_gray(imagem, 9);
-    salvarImagemGray(imagem, "imagens", "lena_blur");
+    salvarTxtGray(imagem, "imagens", "lena_blur");
 
     return 0;
 }

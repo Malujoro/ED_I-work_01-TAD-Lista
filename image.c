@@ -5,8 +5,6 @@
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 
-char *caminhoAtual;
-
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -185,6 +183,7 @@ int mediana(int *vetor, int tam)
     return 0;
 }
 
+// TODO [arrumar função!!]
 void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
 {
     int tam = 256, quant = contarPastas(pasta);
@@ -356,7 +355,6 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
     }
 
     // caminho = liberarVetor(caminho);
-    caminhoAtual = caminho;
     fclose(arquivo);
 }
 
@@ -372,7 +370,7 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 {
     salvarTxtGray(imagem, caminho, nome);
 
-    python(caminhoAtual, "txt", "gray", caminho, nome, "png");
+    // python(caminhoAtual, "txt", "gray", caminho, nome, "png");
 
     // caminho = liberarVetor(caminho);
 }
@@ -387,20 +385,20 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 ////////////////// Funções para Operações //////////////////
 
 // // Operações para ImageGray
-// ImageGray *flip_vertical_gray(ImageGray *image)
-// {
+ImageGray *flip_vertical_gray(ImageGray *image)
+{
 
-// }
+}
 
-// ImageGray *flip_horizontal_gray(ImageGray *image)
-// {
+ImageGray *flip_horizontal_gray(ImageGray *image)
+{
 
-// }
+}
 
-// ImageGray *transpose_gray(const ImageGray *image)
-// {
+ImageGray *transpose_gray(const ImageGray *image)
+{
 
-// }
+}
 
 
 // // Operações para ImageRGB
