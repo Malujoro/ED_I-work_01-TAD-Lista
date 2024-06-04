@@ -56,6 +56,19 @@ int *alocarInt(int tam)
     return vetor;
 }
 
+float *alocarFloat(int tam)
+{
+    float *vetor = (float *) calloc(tam, sizeof(float));
+
+    if(!vetor)
+    {
+        printf("Erro ao alocar float");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
+}
+
 PixelRGB *alocarPixelRGB(int tam)
 {
     PixelRGB *vetor = (PixelRGB *) malloc(tam * sizeof(PixelRGB));
@@ -86,6 +99,12 @@ void *liberarVetor(void *vetor)
 {
     free(vetor);
     return NULL;
+}
+
+void limparFloat(float *vetor, int tam)
+{
+    for(int i = 0; i < tam; i++)
+        vetor[i] = 0;
 }
 
 // Função para converter um Inteiro em String
@@ -421,17 +440,129 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 
 ///////////// Funções de Manipulação por Pixel /////////////
 
-int cdf(int *vetor, int pos)
+float cdf(float *vetor, int pos)
 {
-    int soma = 0;
+    float soma = 0;
     for(int i = 0; i <= pos; i++)
         soma += vetor[i];
     return soma;
 }
 
-int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max)
+float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max)
 {
-    return ((float) (cdf_i - cdf_min)) / (cdf_max - cdf_min) * 255;
+    return (cdf_i - cdf_min) / (cdf_max - cdf_min) * 255;
+}
+
+void redistribuirHistograma(float *histograma)
+{
+    int limite;
+    float soma, somaTotal;
+    do
+    {
+        limite = 0;
+        soma = 0;
+        somaTotal = 0;
+
+        // Redistribuir os valores enquanto algum passar do limite
+        // Somar os passados
+        for(int i = 0; i < 256; i++)
+        {
+            somaTotal += histograma[i];
+            if(histograma[i] > clip_limit)
+            {
+                limite = 1;
+                soma += histograma[i] - clip_limit;
+                histograma[i] = clip_limit;
+            }
+        }
+
+        // Blindagem contra looping infinito (impossível de redistribuir)
+        if(somaTotal >= 256 * clip_limit)
+            limite = 0;
+
+        // Distribuir os valores igualmente
+        if(limite)
+        {
+            for(int i = 0; i < 256; i++)
+                histograma[i] += soma / 256;
+        }
+    }while(limite);
+}
+
+int posMinimo(float *histograma)
+{
+    for(int i = 0; i < 256; i++)
+    {
+        if(histograma[i] != 0)
+            return i;
+    }
+    return 0;
+}
+
+int posMaximo(float *histograma)
+{
+    for(int i = 255; i >= 0; i--)
+    {
+        if(histograma[i] != 0)
+            return i;
+    }
+    return 255;
+}
+
+void suavizaLinha(ImageGray *image, int height)
+{
+    float media, pixel1, pixel2;
+    int aux1, aux2;
+    int quant = image->dim.altura / height;
+    
+    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    if(image->dim.altura % height == 0)
+        quant--;
+
+    aux1 = height - 1;
+    aux2 = height;
+
+    for(int i = 0; i < quant; i++)
+    {
+        for(int j = 0; j < image->dim.largura; j++)
+        {
+            pixel1 = image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value;
+            pixel2 = image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value;
+            media = (pixel1 + pixel2) / 2;
+            image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value = media;
+            image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value = media;
+        }
+        aux1 += height;
+        aux2 += height;
+    }
+}
+
+void suavizaColuna(ImageGray *image, int width)
+{
+    float media, pixel1, pixel2;
+    int aux1, aux2;
+    int quant = image->dim.largura / width;
+    
+    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    if(image->dim.largura % width == 0)
+        quant--;
+
+    aux1 = width - 1;
+    aux2 = width;
+
+    for(int i = 0; i < quant; i++)
+    {
+        for(int j = 0; j < image->dim.altura; j++)
+        {
+            pixel1 = image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value;
+            pixel2 = image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value;
+            media = (pixel1 + pixel2) / 2;
+            image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value = media;
+            image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value = media;
+        }
+        aux1 += width;
+        aux2 += width;
+    }
 }
 
 // Manipulação por pixel para ImageGray
@@ -449,12 +580,13 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 
     ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
     int tamVet = tile_height * tile_width;
-    int *vetor = alocarInt(tamVet);
-    int *histograma = alocarInt(256);
+    float *vetor = alocarFloat(tamVet);
+    float *histograma = alocarFloat(256);
     for(int a = 0; a < caixaY; a++)
     {
         for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
         {
+            // Monta o Tile
             for(int i = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
             {
                 for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
@@ -463,61 +595,14 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
             
             // Monta o Histograma
             for(int i = 0; i < tam; i++)
-                histograma[vetor[i]]++;
+                histograma[(int) vetor[i]]++;
 
-            int limite, soma, somaTotal;
-            do
-            {
-                limite = 0;
-                soma = 0;
-                somaTotal = 0;
-
-                // Redistribuir os valores enquanto algum passar do limite
-                // Somar os passados
-                for(int i = 0; i < 256; i++)
-                {
-                    somaTotal += histograma[i];
-                    if(histograma[i] > clip_limit)
-                    {
-                        limite = 1;
-                        soma += histograma[i] - clip_limit;
-                        histograma[i] = clip_limit;
-                    }
-                }
-                // Blindagem contra looping infinito
-                if(somaTotal >= 256 * clip_limit)
-                    limite = 0;
-                // Distribuir os valores igualmente
-                if(limite)
-                {
-                    for(int i = 0; i < 256; i++)
-                        histograma[i] += soma / 256;
-                }
-            }while(limite);
+            redistribuirHistograma(histograma);
 
             // Encontrar mínimo e máximo
-            int minimo;
-            for(int i = 0; i < 256; i++)
-            {
-                if(histograma[i] != 0)
-                {
-                    minimo = i;
-                    break;
-                }
-            }
+            int minimo = cdf(histograma, posMinimo(histograma));
+            int maximo = cdf(histograma, posMaximo(histograma));
 
-            int maximo;
-            for(int i = 255; i >= 0; i--)
-            {
-                if(histograma[i] != 0)
-                {
-                    maximo = i;
-                    break;
-                }
-            }
-
-            maximo = cdf(histograma, maximo);
-            minimo = cdf(histograma, minimo);
             // Remapeia todo o bloco
             if(maximo != minimo)
             {
@@ -528,46 +613,17 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
                 }
             }
 
-            for(int i = 0; i < tam; i++)
-                vetor[i] = 0;
-
-            for(int i = 0; i < 256; i++)
-                histograma[i] = 0;
+            limparFloat(vetor, tam);
+            limparFloat(histograma, 256);
         }
     }
     histograma = liberarVetor(histograma);
     vetor = liberarVetor(vetor);
+
+    suavizaColuna(resultado, tile_width);
+    suavizaLinha(resultado, tile_height);
+
     return resultado;
-
-    // // Suavização das COLUNAS (ex: 16x16 de imagem 64x64)
-    // // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
-    // int aux1, aux2;
-    // int quant = image->dim.largura / tile_width;
-    // if(image->dim.largura % tile_width == 0)
-    //     quant--;
-
-    // // coluna1 = tile_width - 1 (15)
-    // // coluna2 = tile_width (16)
-    // // for() (quant) (4 caixas)
-    // //     for(altura)
-    // //         média entre [ J ][col1] e [ J ][col2] 
-    // //     coluna1 += tile_width
-    // //     coluna2 += tile_width
-
-
-    // // Suavização das LINHAS (ex: 16x16 de imagem 64x64)
-    // // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
-    // quant = image->dim.altura / tile_height;
-    // if(image->dim.altura % tile_height == 0)
-    //     quant--;
-
-    // // coluna1 = tile_heigth - 1 (15)
-    // // coluna2 = tile_heigth (16)
-    // // for() (quant) (4 caixas)
-    // //     for(largura)
-    // //         média entre [col1][ J ] e [col2][ J ]
-    // //     coluna1 += tile_heigth
-    // //     coluna2 += tile_heigth
 }
 
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
