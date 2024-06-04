@@ -5,6 +5,7 @@
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 
+int clip_limit = 40;
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -55,6 +56,19 @@ int *alocarInt(int tam)
     return vetor;
 }
 
+float *alocarFloat(int tam)
+{
+    float *vetor = (float *) calloc(tam, sizeof(float));
+
+    if(!vetor)
+    {
+        printf("Erro ao alocar float");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
+}
+
 PixelRGB *alocarPixelRGB(int tam)
 {
     PixelRGB *vetor = (PixelRGB *) malloc(tam * sizeof(PixelRGB));
@@ -85,6 +99,12 @@ void *liberarVetor(void *vetor)
 {
     free(vetor);
     return NULL;
+}
+
+void limparFloat(float *vetor, int tam)
+{
+    for(int i = 0; i < tam; i++)
+        vetor[i] = 0;
 }
 
 // Função para converter um Inteiro em String
@@ -162,6 +182,27 @@ int contarPastas(char *caminho)
     return quant;
 }
 
+// TODO [arrumar função!!]
+void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
+{
+    int tam = 256, quant = contarPastas(pasta);
+    char comando[tam];
+
+    if(tipo[0] == 't')
+        quant--;
+    
+    char *num = intParaStr(quant);
+    char *caminho = gerarCaminho(pasta, num, "/");
+    pastaExiste(caminho);
+    num = liberarVetor(num);
+
+    snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
+
+    system(comando);
+}
+
+///////// Auxiliar Median Blur /////////
+
 int mediana(int *vetor, int tam)
 {
     int *gray = alocarInt(256);
@@ -183,23 +224,131 @@ int mediana(int *vetor, int tam)
     return 0;
 }
 
-// TODO [arrumar função!!]
-void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
+//////////// Auxiliar Clahe ////////////
+
+float cdf(float *vetor, int pos)
 {
-    int tam = 256, quant = contarPastas(pasta);
-    char comando[tam];
+    float soma = 0;
+    for(int i = 0; i <= pos; i++)
+        soma += vetor[i];
+    return soma;
+}
 
-    if(tipo[0] == 't')
-        quant--;
+float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max)
+{
+    return (cdf_i - cdf_min) / (cdf_max - cdf_min) * 255;
+}
+
+void redistribuirHistograma(float *histograma)
+{
+    int limite;
+    float soma, somaTotal;
+    do
+    {
+        limite = 0;
+        soma = 0;
+        somaTotal = 0;
+
+        // Redistribuir os valores enquanto algum passar do limite
+        // Somar os passados
+        for(int i = 0; i < 256; i++)
+        {
+            somaTotal += histograma[i];
+            if(histograma[i] > clip_limit)
+            {
+                limite = 1;
+                soma += histograma[i] - clip_limit;
+                histograma[i] = clip_limit;
+            }
+        }
+
+        // Blindagem contra looping infinito (impossível de redistribuir)
+        if(somaTotal >= 256 * clip_limit)
+            limite = 0;
+
+        // Distribuir os valores igualmente
+        if(limite)
+        {
+            for(int i = 0; i < 256; i++)
+                histograma[i] += soma / 256;
+        }
+    }while(limite);
+}
+
+int posMinimo(float *histograma)
+{
+    for(int i = 0; i < 256; i++)
+    {
+        if(histograma[i] != 0)
+            return i;
+    }
+    return 0;
+}
+
+int posMaximo(float *histograma)
+{
+    for(int i = 255; i >= 0; i--)
+    {
+        if(histograma[i] != 0)
+            return i;
+    }
+    return 255;
+}
+
+void suavizaLinhaGray(ImageGray *image, int height)
+{
+    float media, pixel1, pixel2;
+    int aux1, aux2;
+    int quant = image->dim.altura / height;
     
-    char *num = intParaStr(quant);
-    char *caminho = gerarCaminho(pasta, num, "/");
-    pastaExiste(caminho);
-    num = liberarVetor(num);
+    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    if(image->dim.altura % height == 0)
+        quant--;
 
-    snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
+    aux1 = height - 1;
+    aux2 = height;
 
-    system(comando);
+    for(int i = 0; i < quant; i++)
+    {
+        for(int j = 0; j < image->dim.largura; j++)
+        {
+            pixel1 = image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value;
+            pixel2 = image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value;
+            media = (pixel1 + pixel2) / 2;
+            image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value = media;
+            image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value = media;
+        }
+        aux1 += height;
+        aux2 += height;
+    }
+}
+
+void suavizaColunaGray(ImageGray *image, int width)
+{
+    float media, pixel1, pixel2;
+    int aux1, aux2;
+    int quant = image->dim.largura / width;
+    
+    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    if(image->dim.largura % width == 0)
+        quant--;
+
+    aux1 = width - 1;
+    aux2 = width;
+
+    for(int i = 0; i < quant; i++)
+    {
+        for(int j = 0; j < image->dim.altura; j++)
+        {
+            pixel1 = image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value;
+            pixel2 = image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value;
+            media = (pixel1 + pixel2) / 2;
+            image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value = media;
+            image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value = media;
+        }
+        aux1 += width;
+        aux2 += width;
+    }
 }
 
 ////////////// Funções de criação e liberação //////////////
@@ -385,20 +534,20 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 ////////////////// Funções para Operações //////////////////
 
 // // Operações para ImageGray
-ImageGray *flip_vertical_gray(ImageGray *image)
-{
+// ImageGray *flip_vertical_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *flip_horizontal_gray(ImageGray *image)
-{
+// ImageGray *flip_horizontal_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *transpose_gray(const ImageGray *image)
-{
+// ImageGray *transpose_gray(const ImageGray *image)
+// {
 
-}
+// }
 
 
 // // Operações para ImageRGB
@@ -421,11 +570,65 @@ ImageGray *transpose_gray(const ImageGray *image)
 ///////////// Funções de Manipulação por Pixel /////////////
 
 // Manipulação por pixel para ImageGray
-// ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
-// {
-    // int quantY = image->dim.altura / kernel_size;
-    // int quantX = image->dim.largura / kernel_size;
-// }
+ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
+{
+    int caixaX, caixaY;
+
+    caixaX = image->dim.largura / tile_width;
+    if(image->dim.largura % tile_width != 0)
+        caixaX++;
+
+    caixaY = image->dim.altura / tile_height;
+    if(image->dim.altura % tile_height != 0)
+        caixaY++;
+
+    ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
+    int tamVet = tile_height * tile_width;
+    float *vetor = alocarFloat(tamVet);
+    float *histograma = alocarFloat(256);
+    for(int a = 0; a < caixaY; a++)
+    {
+        for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
+        {
+            // Monta o Tile
+            for(int i = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
+            {
+                for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
+                    vetor[tam] = image->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value;
+            }
+            
+            // Monta o Histograma
+            for(int i = 0; i < tam; i++)
+                histograma[(int) vetor[i]]++;
+
+            redistribuirHistograma(histograma);
+
+            // Encontrar mínimo e máximo
+            int minimo = cdf(histograma, posMinimo(histograma));
+            int maximo = cdf(histograma, posMaximo(histograma));
+
+            // Remapeia todo o bloco
+            if(maximo != minimo)
+            {
+                for(int i = 0, tam = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
+                {
+                    for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
+                        resultado->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value = cdf_normalizado(cdf(histograma, vetor[tam]), minimo, maximo);
+                }
+            }
+
+            limparFloat(vetor, tam);
+            limparFloat(histograma, 256);
+        }
+    }
+    histograma = liberarVetor(histograma);
+    vetor = liberarVetor(vetor);
+
+    suavizaColunaGray(resultado, tile_width);
+    suavizaLinhaGray(resultado, tile_height);
+
+    return resultado;
+}
 
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
 {

@@ -35,26 +35,41 @@ FILE *lerArquivo(char *caminho, char *modo);
 
 char *alocarStr(int tam);
 int *alocarInt(int tam);
+float *alocarFloat(int tam);
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
 PixelGray *alocarPixelGray(int tam);
 
 void *liberarVetor(void *vetor);
+void limparFloat(float *vetor, int tam);
 
 char *intParaStr(int num);
 
 char *gerarCaminho(char *pasta, char *nome, char *tipo);
 
 void criarPasta(char *caminho);
-
+int pastaExiste(char *caminho);
 int contarPastas(char *caminho);
-
-int mediana(int *vetor, int tam);
 
 void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao);
 
+///////// Auxiliar Median Blur /////////
+
+int mediana(int *vetor, int tam);
+
+//////////// Auxiliar Clahe ////////////
+
+float cdf(float *vetor, int pos);
+float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max);
+void redistribuirHistograma(float *histograma);
+int posMinimo(float *histograma);
+int posMaximo(float *histograma);
+void suavizaLinhaGray(ImageGray *image, int height);
+void suavizaColunaGray(ImageGray *image, int width);
+
 ////////////// Funções de criação e liberação //////////////
+
 ImageGray *create_image_gray(int largura, int altura);
 void free_image_gray(ImageGray *image);
 
