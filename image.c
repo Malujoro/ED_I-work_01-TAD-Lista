@@ -5,6 +5,7 @@
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 
+int clip_limit = 40;
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -385,20 +386,20 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
 ////////////////// Funções para Operações //////////////////
 
 // // Operações para ImageGray
-ImageGray *flip_vertical_gray(ImageGray *image)
-{
+// ImageGray *flip_vertical_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *flip_horizontal_gray(ImageGray *image)
-{
+// ImageGray *flip_horizontal_gray(ImageGray *image)
+// {
 
-}
+// }
 
-ImageGray *transpose_gray(const ImageGray *image)
-{
+// ImageGray *transpose_gray(const ImageGray *image)
+// {
 
-}
+// }
 
 
 // // Operações para ImageRGB
@@ -420,12 +421,154 @@ ImageGray *transpose_gray(const ImageGray *image)
 
 ///////////// Funções de Manipulação por Pixel /////////////
 
+int cdf(int *vetor, int pos)
+{
+    int soma = 0;
+    for(int i = 0; i <= pos; i++)
+        soma += vetor[i];
+    return soma;
+}
+
+int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max)
+{
+    return ((float) (cdf_i - cdf_min)) / (cdf_max - cdf_min) * 255;
+}
+
 // Manipulação por pixel para ImageGray
-// ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
-// {
-    // int quantY = image->dim.altura / kernel_size;
-    // int quantX = image->dim.largura / kernel_size;
-// }
+ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
+{
+    int caixaX, caixaY;
+
+    caixaX = image->dim.largura / tile_width;
+    if(image->dim.largura % tile_width != 0)
+        caixaX++;
+
+    caixaY = image->dim.altura / tile_height;
+    if(image->dim.altura % tile_height != 0)
+        caixaY++;
+
+    ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
+    int tamVet = tile_height * tile_width;
+    int *vetor = alocarInt(tamVet);
+    int *histograma = alocarInt(256);
+    for(int a = 0; a < caixaY; a++)
+    {
+        for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
+        {
+            for(int i = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
+            {
+                for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
+                    vetor[tam] = image->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value;
+            }
+            
+            // Monta o Histograma
+            for(int i = 0; i < tam; i++)
+                histograma[vetor[i]]++;
+
+            int limite, soma, somaTotal;
+            do
+            {
+                limite = 0;
+                soma = 0;
+                somaTotal = 0;
+
+                // Redistribuir os valores enquanto algum passar do limite
+                // Somar os passados
+                for(int i = 0; i < 256; i++)
+                {
+                    somaTotal += histograma[i];
+                    if(histograma[i] > clip_limit)
+                    {
+                        limite = 1;
+                        soma += histograma[i] - clip_limit;
+                        histograma[i] = clip_limit;
+                    }
+                }
+                // Blindagem contra looping infinito
+                if(somaTotal >= 256 * clip_limit)
+                    limite = 0;
+                // Distribuir os valores igualmente
+                if(limite)
+                {
+                    for(int i = 0; i < 256; i++)
+                        histograma[i] += soma / 256;
+                }
+            }while(limite);
+
+            // Encontrar mínimo e máximo
+            int minimo;
+            for(int i = 0; i < 256; i++)
+            {
+                if(histograma[i] != 0)
+                {
+                    minimo = i;
+                    break;
+                }
+            }
+
+            int maximo;
+            for(int i = 255; i >= 0; i--)
+            {
+                if(histograma[i] != 0)
+                {
+                    maximo = i;
+                    break;
+                }
+            }
+
+            maximo = cdf(histograma, maximo);
+            minimo = cdf(histograma, minimo);
+            // Remapeia todo o bloco
+            if(maximo != minimo)
+            {
+                for(int i = 0, tam = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
+                {
+                    for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
+                        resultado->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value = cdf_normalizado(cdf(histograma, vetor[tam]), minimo, maximo);
+                }
+            }
+
+            for(int i = 0; i < tam; i++)
+                vetor[i] = 0;
+
+            for(int i = 0; i < 256; i++)
+                histograma[i] = 0;
+        }
+    }
+    histograma = liberarVetor(histograma);
+    vetor = liberarVetor(vetor);
+    return resultado;
+
+    // // Suavização das COLUNAS (ex: 16x16 de imagem 64x64)
+    // // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    // int aux1, aux2;
+    // int quant = image->dim.largura / tile_width;
+    // if(image->dim.largura % tile_width == 0)
+    //     quant--;
+
+    // // coluna1 = tile_width - 1 (15)
+    // // coluna2 = tile_width (16)
+    // // for() (quant) (4 caixas)
+    // //     for(altura)
+    // //         média entre [ J ][col1] e [ J ][col2] 
+    // //     coluna1 += tile_width
+    // //     coluna2 += tile_width
+
+
+    // // Suavização das LINHAS (ex: 16x16 de imagem 64x64)
+    // // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
+    // quant = image->dim.altura / tile_height;
+    // if(image->dim.altura % tile_height == 0)
+    //     quant--;
+
+    // // coluna1 = tile_heigth - 1 (15)
+    // // coluna2 = tile_heigth (16)
+    // // for() (quant) (4 caixas)
+    // //     for(largura)
+    // //         média entre [col1][ J ] e [col2][ J ]
+    // //     coluna1 += tile_heigth
+    // //     coluna2 += tile_heigth
+}
 
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
 {
