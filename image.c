@@ -4,6 +4,11 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
+#include <python3.12/Python.h> // API para utilizar o python em C
+
+#define SCRIPT 0
+#define FUNCAO 1
+#define ARGUMENTOS 2
 
 int clip_limit = 40;
 // TODO Criar função de se comunicar com python
@@ -67,6 +72,28 @@ float *alocarFloat(int tam)
     }
 
     return vetor;
+}
+
+PyObject **alocarPython(int tam)
+{
+    PyObject **matriz = (PyObject **) malloc(tam * sizeof(PyObject *));
+
+    if(matriz != NULL)
+    {
+        // for(int i = 0; i < tam; i++)
+        // {
+        //     matriz[i] = (PyObject *) malloc(sizeof(PyObject));
+
+        //     if(!matriz[i])
+        //     {
+        //         printf("Erro ao alocar PyObject");
+        //         exit(EXIT_FAILURE);
+        //     }        
+        // }
+        return matriz;
+    }
+    printf("Erro ao alocar PyObject");
+    exit(EXIT_FAILURE);
 }
 
 PixelRGB *alocarPixelRGB(int tam)
@@ -199,6 +226,96 @@ void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *
     snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
 
     system(comando);
+}
+
+// Função para inicializar o interpretador python
+PyObject **inicializaPython(char *funcao, char *image_path, char *output_path, int gray)
+{
+    // Inicializa o interpretador python
+    Py_Initialize();
+
+    // Adiciona o diretório atual ao caminho do sistema, permitindo que o script seja encontrado
+    PyRun_SimpleString("import sys");
+    PyRun_SimpleString("sys.path.append(\".\")");
+
+    PyObject **matriz = alocarPython(3);
+
+    // "Inclui" o script cujo caminho é utils/image_utils.py
+    PyObject *nomeScript = PyUnicode_DecodeFSDefault("utils.image_utils");
+    matriz[SCRIPT] = PyImport_Import(nomeScript);
+    Py_DECREF(nomeScript); // Libera a memória de um PyObject
+
+    if (matriz[SCRIPT] != NULL)
+    {
+        // "Importa" a função passada como parâmetro
+        matriz[FUNCAO] = PyObject_GetAttrString(matriz[SCRIPT], funcao);
+
+        // Verifica se a função é "chamável"
+        if (PyCallable_Check(matriz[FUNCAO]))
+            return matriz;
+        
+        Py_DECREF(matriz[SCRIPT]);
+    }
+    PyErr_Print();
+    exit(EXIT_FAILURE);
+}
+
+// Função para finalizar o interpretador python
+void executaPython(PyObject **matriz)
+{
+    PyObject *retorno = PyObject_CallObject(matriz[FUNCAO], matriz[ARGUMENTOS]);
+
+    if (!retorno)
+    {
+        PyErr_Print();
+        exit(EXIT_FAILURE);
+    }
+
+    Py_DECREF(retorno);
+}
+
+// Função para finalizar o interpretador python
+void finalizaPython(PyObject **matriz)
+{
+    Py_DECREF(matriz[ARGUMENTOS]);
+    Py_DECREF(matriz[FUNCAO]);
+    Py_DECREF(matriz[SCRIPT]);
+    free(matriz);
+
+    // Finaliza o interpretador
+    Py_Finalize();
+}
+
+void txt_from_image(char *image_path, char *output_path, int gray)
+{
+    PyObject **matriz = inicializaPython("txt_from_image_gray", image_path, output_path, gray);
+
+    // Organiza os argumentos da função
+    matriz[ARGUMENTOS] = PyTuple_Pack(3, PyUnicode_FromString(image_path), PyUnicode_FromString(output_path), PyLong_FromLong(gray));
+
+    // Chama a função Python e obtém o resultado
+    executaPython(matriz);
+    finalizaPython(matriz);
+}
+
+
+void image_from_txt(char *txt_path, char *output_path, int gray)
+{
+    char *nome;
+
+    if(gray)
+        nome = "image_gray_from_txt";
+    else
+        nome = "image_rgb_from_txt";
+
+    PyObject **matriz = inicializaPython(nome, txt_path, output_path, gray);
+
+    // Organiza os argumentos da função
+    matriz[ARGUMENTOS] = PyTuple_Pack(2, PyUnicode_FromString(txt_path), PyUnicode_FromString(output_path));
+
+    // Chama a função Python e obtém o resultado
+    executaPython(matriz);
+    finalizaPython(matriz);
 }
 
 ///////// Auxiliar Median Blur /////////
