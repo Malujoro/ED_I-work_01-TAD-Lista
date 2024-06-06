@@ -9,8 +9,6 @@
                 "-g",
                 "${file}",
                 "-o",
-                // "$(python3-config --cflags)",
-                // "$(python3-config --ldflags)",
                 "${fileDirname}/output/${fileBasenameNoExtension}",
                 "-I/usr/include/python3.12",
                 "-lpython3.12",

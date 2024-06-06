@@ -139,7 +139,6 @@ char *intParaStr(int num)
 {
     int tam, quant;
     for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
-    printf("tam = [%d] | quant = [%d]\n", tam, quant);
 
     char *result = alocarStr(quant);
 
@@ -153,19 +152,32 @@ char *intParaStr(int num)
     return result;
 }
 
-char *gerarCaminho(char *pasta, char *nome, char *tipo)
+char *gerarCaminho(char *pasta, char *simbolo, char *nome)
 {
     int tamanho = 128;
     char *caminho = alocarStr(tamanho);
 
-    snprintf(caminho, tamanho, "%s%s%s", pasta, tipo, nome);
+    snprintf(caminho, tamanho, "%s%s%s", pasta, simbolo, nome);
 
     return caminho;
 }
 
+DIR *abrirPasta(char *caminho)
+{
+    DIR *pasta = opendir(caminho);
+
+    if(!pasta)
+    {
+        printf("Erro ao abrir pasta");
+        exit(EXIT_FAILURE);
+    }
+    
+    return pasta;
+}
+
 void criarPasta(char *caminho)
 {
-    if (mkdir(caminho, 0755) != 0)
+    if(mkdir(caminho, 0755) != 0)
     {
         printf("Erro ao criar pasta");
         exit(EXIT_FAILURE);
@@ -181,51 +193,36 @@ int pastaExiste(char *caminho)
         closedir(pasta);
         return 1;
     }
-
-    criarPasta(caminho);
     return 0;
 }
 
 int contarPastas(char *caminho)
 {
-    DIR *pasta = opendir(caminho);
+    DIR *pasta = abrirPasta(caminho);
 
-    if(!pasta)
-    {
-        printf("Erro ao abrir pasta");
-        exit(EXIT_FAILURE);
-    }
-
-    struct dirent *entrada = readdir(pasta);
+    struct dirent *entrada;
     int quant = -1;
 
-    while(entrada)
+    for(entrada = readdir(pasta); entrada; entrada = readdir(pasta))
     {
-        quant++;
-        entrada = readdir(pasta);
+        if(entrada->d_type == DT_DIR)
+            quant++;
     }
 
     closedir(pasta);
     return quant;
 }
 
-// TODO [arrumar função!!]
-void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
+char *pastaPrincipal(char *caminho)
 {
-    int tam = 256, quant = contarPastas(pasta);
-    char comando[tam];
+    char *num = intParaStr(contarPastas(caminho));
+    char *caminho2 = gerarCaminho(caminho, "/", num);
 
-    if(tipo[0] == 't')
-        quant--;
-    
-    char *num = intParaStr(quant);
-    char *caminho = gerarCaminho(pasta, num, "/");
-    pastaExiste(caminho);
+    if(!pastaExiste(caminho2))
+        criarPasta(caminho2);
+
     num = liberarVetor(num);
-
-    snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
-
-    system(comando);
+    return caminho2;
 }
 
 // Função para inicializar o interpretador python
@@ -286,6 +283,7 @@ void finalizaPython(PyObject **matriz)
     Py_Finalize();
 }
 
+
 void txt_from_image(char *image_path, char *output_path, int gray)
 {
     PyObject **matriz = inicializaPython("txt_from_image_gray", image_path, output_path, gray);
@@ -297,7 +295,6 @@ void txt_from_image(char *image_path, char *output_path, int gray)
     executaPython(matriz);
     finalizaPython(matriz);
 }
-
 
 void image_from_txt(char *txt_path, char *output_path, int gray)
 {
@@ -380,7 +377,7 @@ void redistribuirHistograma(float *histograma)
         }
 
         // Blindagem contra looping infinito (impossível de redistribuir)
-        if(somaTotal >= 256 * clip_limit)
+        if(somaTotal >= 256 * clip_limit || soma <= 0.001)
             limite = 0;
 
         // Distribuir os valores igualmente
@@ -549,10 +546,8 @@ ImageRGB *copiarImagemRGB(const ImageRGB *image)
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *lerTxtGray(char *pasta, char *nome)
+ImageGray *lerTxtGray(char *caminho)
 {
-    char *caminho = gerarCaminho(pasta, nome, "/");
-    caminho = gerarCaminho(caminho, "txt", ".");
     FILE *arquivo = lerArquivo(caminho, "r");
     
     int altura, largura;
@@ -584,12 +579,10 @@ ImageGray *lerTxtGray(char *pasta, char *nome)
 
 
 // TODO Falta completar [Python]
-ImageGray *lerImagemGray(char *origem, char *pasta, char *nome)
+ImageGray *lerImagemGray(char *png, char *txt)
 {
-    // Utilizar a função txt from image gray
-    python(origem, "png", "gray", pasta, nome, "txt");
-
-    return lerTxtGray(pasta, nome);
+    txt_from_image(png, txt, 1);
+    return lerTxtGray(txt);
 }
 
 // TODO RGB futuro
@@ -599,12 +592,12 @@ ImageGray *lerImagemGray(char *origem, char *pasta, char *nome)
 // }
 
 
-void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
-{
-    pastaExiste(caminho);
-    caminho = gerarCaminho(caminho, nome, "/");
-    caminho = gerarCaminho(caminho, "txt", ".");
-    FILE *arquivo = lerArquivo(caminho, "w");
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt)
+{       
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
+
+    FILE *arquivo = lerArquivo(txt, "w");
 
     fprintf(arquivo, "%d", imagem->dim.altura);
     fputc('\n', arquivo);
@@ -620,7 +613,6 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
         fputc('\n', arquivo);
     }
 
-    // caminho = liberarVetor(caminho);
     fclose(arquivo);
 }
 
@@ -632,13 +624,14 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
 
 
 // TODO Falta completar [Python]
-void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 {
-    salvarTxtGray(imagem, caminho, nome);
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
 
-    // python(caminhoAtual, "txt", "gray", caminho, nome, "png");
+    salvarTxtGray(imagem, caminho, txt);
 
-    // caminho = liberarVetor(caminho);
+    image_from_txt(txt, png, 1);
 }
 
 // TODO RGB futuro
@@ -787,6 +780,16 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
     }
 
     return blur;
+}
+
+ImageGray *negativo_gray(const ImageGray *image)
+{
+    ImageGray *result = create_image_gray(image->dim.largura, image->dim.altura);
+
+    for(int i = 0; i < result->dim.altura * result->dim.largura; i++)
+        result->pixels[i].value = 255 - image->pixels[i].value;
+    
+    return result;
 }
 
 // // Manipulação por pixel para ImageRGB

@@ -2,6 +2,8 @@
     "files.associations": {
         "stdio.h": "c",
         "types.h": "c",
-        "python.h": "c"
+        "python.h": "c",
+        "stat.h": "c",
+        "dirent.h": "c"
     }
 }
