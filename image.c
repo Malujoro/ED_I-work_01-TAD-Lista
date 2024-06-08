@@ -4,6 +4,11 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
+#include <python3.12/Python.h> // API para utilizar o python em C
+
+#define SCRIPT 0
+#define FUNCAO 1
+#define ARGUMENTOS 2
 
 int clip_limit = 40;
 // TODO Criar função de se comunicar com python
@@ -69,6 +74,28 @@ float *alocarFloat(int tam)
     return vetor;
 }
 
+PyObject **alocarPython(int tam)
+{
+    PyObject **matriz = (PyObject **) malloc(tam * sizeof(PyObject *));
+
+    if(matriz != NULL)
+    {
+        // for(int i = 0; i < tam; i++)
+        // {
+        //     matriz[i] = (PyObject *) malloc(sizeof(PyObject));
+
+        //     if(!matriz[i])
+        //     {
+        //         printf("Erro ao alocar PyObject");
+        //         exit(EXIT_FAILURE);
+        //     }        
+        // }
+        return matriz;
+    }
+    printf("Erro ao alocar PyObject");
+    exit(EXIT_FAILURE);
+}
+
 PixelRGB *alocarPixelRGB(int tam)
 {
     PixelRGB *vetor = (PixelRGB *) malloc(tam * sizeof(PixelRGB));
@@ -112,7 +139,6 @@ char *intParaStr(int num)
 {
     int tam, quant;
     for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
-    printf("tam = [%d] | quant = [%d]\n", tam, quant);
 
     char *result = alocarStr(quant);
 
@@ -126,19 +152,32 @@ char *intParaStr(int num)
     return result;
 }
 
-char *gerarCaminho(char *pasta, char *nome, char *tipo)
+char *gerarCaminho(char *pasta, char *simbolo, char *nome)
 {
     int tamanho = 128;
     char *caminho = alocarStr(tamanho);
 
-    snprintf(caminho, tamanho, "%s%s%s", pasta, tipo, nome);
+    snprintf(caminho, tamanho, "%s%s%s", pasta, simbolo, nome);
 
     return caminho;
 }
 
+DIR *abrirPasta(char *caminho)
+{
+    DIR *pasta = opendir(caminho);
+
+    if(!pasta)
+    {
+        printf("Erro ao abrir pasta");
+        exit(EXIT_FAILURE);
+    }
+    
+    return pasta;
+}
+
 void criarPasta(char *caminho)
 {
-    if (mkdir(caminho, 0755) != 0)
+    if(mkdir(caminho, 0755) != 0)
     {
         printf("Erro ao criar pasta");
         exit(EXIT_FAILURE);
@@ -154,51 +193,126 @@ int pastaExiste(char *caminho)
         closedir(pasta);
         return 1;
     }
-
-    criarPasta(caminho);
     return 0;
 }
 
 int contarPastas(char *caminho)
 {
-    DIR *pasta = opendir(caminho);
+    DIR *pasta = abrirPasta(caminho);
 
-    if(!pasta)
-    {
-        printf("Erro ao abrir pasta");
-        exit(EXIT_FAILURE);
-    }
-
-    struct dirent *entrada = readdir(pasta);
+    struct dirent *entrada;
     int quant = -1;
 
-    while(entrada)
+    for(entrada = readdir(pasta); entrada; entrada = readdir(pasta))
     {
-        quant++;
-        entrada = readdir(pasta);
+        if(entrada->d_type == DT_DIR)
+            quant++;
     }
 
     closedir(pasta);
     return quant;
 }
 
-// TODO [arrumar função!!]
-void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao)
+char *pastaPrincipal(char *caminho)
 {
-    int tam = 256, quant = contarPastas(pasta);
-    char comando[tam];
+    char *num = intParaStr(contarPastas(caminho));
+    char *caminho2 = gerarCaminho(caminho, "/", num);
 
-    if(tipo[0] == 't')
-        quant--;
-    
-    char *num = intParaStr(quant);
-    char *caminho = gerarCaminho(pasta, num, "/");
-    pastaExiste(caminho);
+    if(!pastaExiste(caminho2))
+        criarPasta(caminho2);
+
     num = liberarVetor(num);
+    return caminho2;
+}
 
-    snprintf(comando, tam, "python3 utils/image_utils.py %s %s %s %s/%s.%s", tipo, cor, origem, caminho, nome, extensao);
+// Função para inicializar o interpretador python
+PyObject **inicializaPython(char *funcao, char *image_path, char *output_path, int gray)
+{
+    // Inicializa o interpretador python
+    Py_Initialize();
 
-    system(comando);
+    // Adiciona o diretório atual ao caminho do sistema, permitindo que o script seja encontrado
+    PyRun_SimpleString("import sys");
+    PyRun_SimpleString("sys.path.append(\".\")");
+
+    PyObject **matriz = alocarPython(3);
+
+    // "Inclui" o script cujo caminho é utils/image_utils.py
+    PyObject *nomeScript = PyUnicode_DecodeFSDefault("utils.image_utils");
+    matriz[SCRIPT] = PyImport_Import(nomeScript);
+    Py_DECREF(nomeScript); // Libera a memória de um PyObject
+
+    if (matriz[SCRIPT] != NULL)
+    {
+        // "Importa" a função passada como parâmetro
+        matriz[FUNCAO] = PyObject_GetAttrString(matriz[SCRIPT], funcao);
+
+        // Verifica se a função é "chamável"
+        if (PyCallable_Check(matriz[FUNCAO]))
+            return matriz;
+        
+        Py_DECREF(matriz[SCRIPT]);
+    }
+    PyErr_Print();
+    exit(EXIT_FAILURE);
+}
+
+// Função para finalizar o interpretador python
+void executaPython(PyObject **matriz)
+{
+    PyObject *retorno = PyObject_CallObject(matriz[FUNCAO], matriz[ARGUMENTOS]);
+
+    if (!retorno)
+    {
+        PyErr_Print();
+        exit(EXIT_FAILURE);
+    }
+
+    Py_DECREF(retorno);
+}
+
+// Função para finalizar o interpretador python
+void finalizaPython(PyObject **matriz)
+{
+    Py_DECREF(matriz[ARGUMENTOS]);
+    Py_DECREF(matriz[FUNCAO]);
+    Py_DECREF(matriz[SCRIPT]);
+    free(matriz);
+
+    // Finaliza o interpretador
+    Py_Finalize();
+}
+
+
+void txt_from_image(char *image_path, char *output_path, int gray)
+{
+    PyObject **matriz = inicializaPython("txt_from_image_gray", image_path, output_path, gray);
+
+    // Organiza os argumentos da função
+    matriz[ARGUMENTOS] = PyTuple_Pack(3, PyUnicode_FromString(image_path), PyUnicode_FromString(output_path), PyLong_FromLong(gray));
+
+    // Chama a função Python e obtém o resultado
+    executaPython(matriz);
+    finalizaPython(matriz);
+}
+
+void image_from_txt(char *txt_path, char *output_path, int gray)
+{
+    char *nome;
+
+    if(gray)
+        nome = "image_gray_from_txt";
+    else
+        nome = "image_rgb_from_txt";
+
+    PyObject **matriz = inicializaPython(nome, txt_path, output_path, gray);
+
+    // Organiza os argumentos da função
+    matriz[ARGUMENTOS] = PyTuple_Pack(2, PyUnicode_FromString(txt_path), PyUnicode_FromString(output_path));
+
+    // Chama a função Python e obtém o resultado
+    executaPython(matriz);
+    finalizaPython(matriz);
 }
 
 ///////// Auxiliar Median Blur /////////
@@ -263,7 +377,7 @@ void redistribuirHistograma(float *histograma)
         }
 
         // Blindagem contra looping infinito (impossível de redistribuir)
-        if(somaTotal >= 256 * clip_limit)
+        if(somaTotal >= 256 * clip_limit || soma <= 0.001)
             limite = 0;
 
         // Distribuir os valores igualmente
@@ -432,10 +546,8 @@ ImageRGB *copiarImagemRGB(const ImageRGB *image)
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *lerTxtGray(char *pasta, char *nome)
+ImageGray *lerTxtGray(char *caminho)
 {
-    char *caminho = gerarCaminho(pasta, nome, "/");
-    caminho = gerarCaminho(caminho, "txt", ".");
     FILE *arquivo = lerArquivo(caminho, "r");
     
     int altura, largura;
@@ -467,12 +579,10 @@ ImageGray *lerTxtGray(char *pasta, char *nome)
 
 
 // TODO Falta completar [Python]
-ImageGray *lerImagemGray(char *origem, char *pasta, char *nome)
+ImageGray *lerImagemGray(char *png, char *txt)
 {
-    // Utilizar a função txt from image gray
-    python(origem, "png", "gray", pasta, nome, "txt");
-
-    return lerTxtGray(pasta, nome);
+    txt_from_image(png, txt, 1);
+    return lerTxtGray(txt);
 }
 
 // TODO RGB futuro
@@ -482,12 +592,12 @@ ImageGray *lerImagemGray(char *origem, char *pasta, char *nome)
 // }
 
 
-void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
-{
-    pastaExiste(caminho);
-    caminho = gerarCaminho(caminho, nome, "/");
-    caminho = gerarCaminho(caminho, "txt", ".");
-    FILE *arquivo = lerArquivo(caminho, "w");
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt)
+{       
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
+
+    FILE *arquivo = lerArquivo(txt, "w");
 
     fprintf(arquivo, "%d", imagem->dim.altura);
     fputc('\n', arquivo);
@@ -503,7 +613,6 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
         fputc('\n', arquivo);
     }
 
-    // caminho = liberarVetor(caminho);
     fclose(arquivo);
 }
 
@@ -515,13 +624,14 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome)
 
 
 // TODO Falta completar [Python]
-void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome)
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 {
-    salvarTxtGray(imagem, caminho, nome);
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
 
-    // python(caminhoAtual, "txt", "gray", caminho, nome, "png");
+    salvarTxtGray(imagem, caminho, txt);
 
-    // caminho = liberarVetor(caminho);
+    image_from_txt(txt, png, 1);
 }
 
 // TODO RGB futuro
@@ -670,6 +780,16 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
     }
 
     return blur;
+}
+
+ImageGray *negativo_gray(const ImageGray *image)
+{
+    ImageGray *result = create_image_gray(image->dim.largura, image->dim.altura);
+
+    for(int i = 0; i < result->dim.altura * result->dim.largura; i++)
+        result->pixels[i].value = 255 - image->pixels[i].value;
+    
+    return result;
 }
 
 // // Manipulação por pixel para ImageRGB
