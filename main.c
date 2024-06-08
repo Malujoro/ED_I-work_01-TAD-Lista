@@ -10,7 +10,7 @@ int main()
     char *imagemOriginal = "utils/lena.png";
 
     char *pasta = pastaPrincipal(caminhoOriginal);
-    char *caminho = gerarCaminho(pasta, "/", "lenaNegativo");
+    char *caminho = gerarCaminho(pasta, "/", "lenaTeste");
     char *txt = gerarCaminho(caminho, ".", "txt");
     char *png = gerarCaminho(caminho, ".", "png");
 
@@ -18,8 +18,8 @@ int main()
     // ImageGray *imagem = lerImagemGray(imagemOriginal, txtOriginal);
     ImageGray *imagem = lerTxtGray(txtOriginal);
     // imagem = median_blur_gray(imagem, 7);
-    // imagem = clahe_gray(imagem, 64, 128);
-    imagem = negativo(imagem);
+    imagem = clahe_gray(imagem, 64, 64);
+    // imagem = negativo(imagem);
     salvarImagemGray(imagem, pasta, txt, png);
 
     return 0;

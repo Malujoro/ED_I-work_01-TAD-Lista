@@ -10,7 +10,7 @@
 #define FUNCAO 1
 #define ARGUMENTOS 2
 
-int clip_limit = 40;
+int clip_limit = 30;
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -21,6 +21,32 @@ int posicaoVetor(int largura, int i, int j)
 {
     return largura * i + j;
 }
+
+void limparVet(int *vetor, int tam)
+{
+    for(int i = 0; i < tam; i++)
+        vetor[i] = 0;
+}
+
+// Função para converter um Inteiro em String
+char *intParaStr(int num)
+{
+    int tam, quant;
+    for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
+
+    char *result = alocarStr(quant);
+
+    for(int i = 0; i < quant; i++)
+    {
+        result[i] = '0' + num / tam;
+        num %= tam;
+        tam /= 10;
+    }
+
+    return result;
+}
+
+/////////////// Alocação ///////////////
 
 FILE *lerArquivo(char *caminho, char *modo)
 {
@@ -73,6 +99,7 @@ float *alocarFloat(int tam)
 
     return vetor;
 }
+
 
 PyObject **alocarPython(int tam)
 {
@@ -128,29 +155,7 @@ void *liberarVetor(void *vetor)
     return NULL;
 }
 
-void limparFloat(float *vetor, int tam)
-{
-    for(int i = 0; i < tam; i++)
-        vetor[i] = 0;
-}
-
-// Função para converter um Inteiro em String
-char *intParaStr(int num)
-{
-    int tam, quant;
-    for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
-
-    char *result = alocarStr(quant);
-
-    for(int i = 0; i < quant; i++)
-    {
-        result[i] = '0' + num / tam;
-        num %= tam;
-        tam /= 10;
-    }
-
-    return result;
-}
+//////////////// Pastas ////////////////
 
 char *gerarCaminho(char *pasta, char *simbolo, char *nome)
 {
@@ -224,6 +229,8 @@ char *pastaPrincipal(char *caminho)
     num = liberarVetor(num);
     return caminho2;
 }
+
+//////////////// Python ////////////////
 
 // Função para inicializar o interpretador python
 PyObject **inicializaPython(char *funcao, char *image_path, char *output_path, int gray)
@@ -340,36 +347,36 @@ int mediana(int *vetor, int tam)
 
 //////////// Auxiliar Clahe ////////////
 
-float cdf(float *vetor, int pos)
+int cdf(int *vetor, int pos)
 {
-    float soma = 0;
+    int soma = 0;
     for(int i = 0; i <= pos; i++)
         soma += vetor[i];
     return soma;
 }
 
-float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max)
+int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max)
 {
-    return (cdf_i - cdf_min) / (cdf_max - cdf_min) * 255;
+    return ((float) (cdf_i - cdf_min)) / (cdf_max - cdf_min) * 255;
 }
 
-void redistribuirHistograma(float *histograma)
+void redistribuirHistograma(int *histograma)
 {
-    int limite;
-    float soma, somaTotal;
+    int *aux = alocarInt(256);
+    int limite, quant = 256;
+    float soma = 0;
     do
     {
-        limite = 0;
-        soma = 0;
-        somaTotal = 0;
+        limite = 0;        
 
         // Redistribuir os valores enquanto algum passar do limite
         // Somar os passados
         for(int i = 0; i < 256; i++)
         {
-            somaTotal += histograma[i];
-            if(histograma[i] > clip_limit)
+            if((!aux[i]) && (histograma[i] > clip_limit))
             {
+                aux[i]++;
+                quant--;
                 limite = 1;
                 soma += histograma[i] - clip_limit;
                 histograma[i] = clip_limit;
@@ -377,19 +384,33 @@ void redistribuirHistograma(float *histograma)
         }
 
         // Blindagem contra looping infinito (impossível de redistribuir)
-        if(somaTotal >= 256 * clip_limit || soma <= 0.001)
+        if(quant == 0)
             limite = 0;
 
         // Distribuir os valores igualmente
-        if(limite)
+        // Efetua a redistribuição se for possível adicionar no mínimo 1 pixel em cada coluna
+        if(limite && soma >= 256)
         {
             for(int i = 0; i < 256; i++)
-                histograma[i] += soma / 256;
+            {
+                if(!aux[i])
+                    histograma[i] += soma / quant;
+            }
+            // Vai pegar "todos os restos" decimais que não entrarão no histograma
+            // (divisão decimal - divisão inteira) * quantidade de colunas "utilizadas"
+            soma = ((soma / quant) - ((int) soma / quant)) * quant;
+        }
+        // Caso possua menos que 256 pixels, eles serão adicionados na menor coluna
+        else if(limite)
+        {
+            histograma[posMenor(histograma)] += soma;
+            soma = 0;
         }
     }while(limite);
+    aux = liberarVetor(aux);
 }
 
-int posMinimo(float *histograma)
+int posMinimo(int *histograma)
 {
     for(int i = 0; i < 256; i++)
     {
@@ -399,14 +420,15 @@ int posMinimo(float *histograma)
     return 0;
 }
 
-int posMaximo(float *histograma)
+int posMenor(int *histograma)
 {
-    for(int i = 255; i >= 0; i--)
+    int posicao = 0;
+    for(int i = 1; i < 256; i++)
     {
-        if(histograma[i] != 0)
-            return i;
+        if(histograma[i] < histograma[posicao])
+            posicao = i;
     }
-    return 255;
+    return posicao;
 }
 
 void suavizaLinhaGray(ImageGray *image, int height)
@@ -434,6 +456,70 @@ void suavizaLinhaGray(ImageGray *image, int height)
         }
         aux1 += height;
         aux2 += height;
+    }
+}
+
+float interpolacaoLinear(int x1, int x2, int x, int valor1, int valor2)
+{
+    float ponto1, ponto2;
+    ponto1 = ((float) (x2 - x)) / (x2 - x1) * valor1;
+    ponto2 = ((float) (x - x1)) / (x2 - x1) * valor2;
+    return ponto1 + ponto2;
+}
+
+int interpolacaoBilinear(int x1, int y1, int x2, int y2, int x, int y, int valores[][2])
+{
+    // float ponto1, ponto2, ponto3, ponto4;
+    float r1, r2, div = (y2 - y);
+
+    r1 = interpolacaoLinear(x1, x2, x, valores[0][0], valores[0][1]);
+    r2 = interpolacaoLinear(x1, x2, x, valores[1][0], valores[1][1]);
+    
+    int ponto1 = (float)(y2 - y1) / div * r1;
+    int ponto2 = (float)(y - y1) / div * r2;
+
+    return ponto1 + ponto2;
+    // return ponto1 + ponto2 + ponto3 + ponto4;
+
+}
+
+void suavizaGray(ImageGray *image)
+{
+    int valores[2][2];
+
+    // Suaviza a primeira e última linha (X) com interpolação linear
+    for(int i = 1; i < image->dim.largura; i++)
+    {
+        for(int j = 0; j < image->dim.altura; j+= image->dim.altura-1)
+        {
+            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, j, i-1)].value;
+            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, j, i+1)].value;
+            image->pixels[posicaoVetor(image->dim.largura, j, i)].value = interpolacaoLinear(j-1, j+1, j, valores[0][0], valores[0][1]);
+        }
+    }
+
+    // Suaviza a primeira e última coluna (Y) com interpolação linear
+    for(int i = 1; i < image->dim.altura; i++)
+    {
+        for(int j = 0; j < image->dim.largura; j+= image->dim.largura-1)
+        {
+            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, i+1, j)].value;
+            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, i-1, j)].value;
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoLinear(i+1, i-1, i, valores[0][0], valores[0][1]);
+        }
+    }
+
+    // Suaviza a imagem inteira com interpolação bilinear
+    for(int i = 1; i < image->dim.altura-1; i++)
+    {
+        for(int j = 1; j < image->dim.largura-1; j++)
+        {
+            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, i+1, j-1)].value;
+            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, i+1, j+1)].value;
+            valores[1][0] = image->pixels[posicaoVetor(image->dim.largura, i-1, j-1)].value;
+            valores[1][1] = image->pixels[posicaoVetor(image->dim.largura, i-1, j+1)].value;
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear(j-1, i+1, j+1, i-1, j, i, valores) % 256;
+        }
     }
 }
 
@@ -694,8 +780,8 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 
     ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
     int tamVet = tile_height * tile_width;
-    float *vetor = alocarFloat(tamVet);
-    float *histograma = alocarFloat(256);
+    int *vetor = alocarInt(tamVet);
+    int *histograma = alocarInt(256);
     for(int a = 0; a < caixaY; a++)
     {
         for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
@@ -709,13 +795,13 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
             
             // Monta o Histograma
             for(int i = 0; i < tam; i++)
-                histograma[(int) vetor[i]]++;
+                histograma[vetor[i]]++;
 
             redistribuirHistograma(histograma);
 
             // Encontrar mínimo e máximo
             int minimo = cdf(histograma, posMinimo(histograma));
-            int maximo = cdf(histograma, posMaximo(histograma));
+            int maximo = tile_width * tile_height;
 
             // Remapeia todo o bloco
             if(maximo != minimo)
@@ -727,15 +813,16 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
                 }
             }
 
-            limparFloat(vetor, tam);
-            limparFloat(histograma, 256);
+            limparVet(vetor, tam);
+            limparVet(histograma, 256);
         }
     }
     histograma = liberarVetor(histograma);
     vetor = liberarVetor(vetor);
 
-    suavizaColunaGray(resultado, tile_width);
-    suavizaLinhaGray(resultado, tile_height);
+    // suavizaColunaGray(resultado, tile_width);
+    // suavizaLinhaGray(resultado, tile_height);
+    suavizaGray(resultado);
 
     return resultado;
 }
