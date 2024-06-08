@@ -644,6 +644,7 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 ////////////////// Funções para Operações //////////////////
 
 // // Operações para ImageGray
+
 // ImageGray *flip_vertical_gray(ImageGray *image)
 // {
 
