@@ -10,6 +10,8 @@
                 "${file}",
                 "-o",
                 "${fileDirname}/output/${fileBasenameNoExtension}",
+                "-I/usr/include/python3.12",
+                "-lpython3.12",
                 "-lm"
             ],
             "options": {

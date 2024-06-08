@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h> // Biblioteca para verificar pastas
+#include <sys/stat.h> // Biblioteca para criar pastas
+#include <python3.12/Python.h> // API para utilizar o python em C
 
 typedef struct dimensoes {
     int altura, largura;
@@ -35,26 +38,41 @@ FILE *lerArquivo(char *caminho, char *modo);
 
 char *alocarStr(int tam);
 int *alocarInt(int tam);
+float *alocarFloat(int tam);
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
 PixelGray *alocarPixelGray(int tam);
 
 void *liberarVetor(void *vetor);
+void limparFloat(float *vetor, int tam);
 
 char *intParaStr(int num);
 
-char *gerarCaminho(char *pasta, char *nome, char *tipo);
+char *gerarCaminho(char *pasta, char *simbolo, char *nome);
 
+DIR *abrirPasta(char *caminho);
 void criarPasta(char *caminho);
-
+int pastaExiste(char *caminho);
 int contarPastas(char *caminho);
+char *pastaPrincipal(char *caminho);
+
+///////// Auxiliar Median Blur /////////
 
 int mediana(int *vetor, int tam);
 
-void python(char *origem, char *tipo, char *cor, char *pasta, char *nome, char *extensao);
+//////////// Auxiliar Clahe ////////////
+
+float cdf(float *vetor, int pos);
+float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max);
+void redistribuirHistograma(float *histograma);
+int posMinimo(float *histograma);
+int posMaximo(float *histograma);
+void suavizaLinhaGray(ImageGray *image, int height);
+void suavizaColunaGray(ImageGray *image, int width);
 
 ////////////// Funções de criação e liberação //////////////
+
 ImageGray *create_image_gray(int largura, int altura);
 void free_image_gray(ImageGray *image);
 
@@ -66,16 +84,16 @@ ImageRGB *copiarImagemRGB(const ImageRGB *image);
 
 ////////////// Funções para leitura e salvamento //////////////
 
-ImageGray *lerTxtGray(char *pasta, char *nome);
-ImageRGB *lerTxtRGB(char *pasta, char *nome);
+ImageGray *lerTxtGray(char *caminho);
+ImageRGB *lerTxtRGB(char *caminho);
 
-ImageGray *lerImagemGray(char *origem, char *pasta, char *nome);
-ImageRGB *lerImagemRGB(char *pasta, char *nome);
+ImageGray *lerImagemGray(char *png, char *txt);
+ImageRGB *lerImagemRGB(char *png, char *txt);
 
-void salvarTxtGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt);
 void salvarTxtRGB(ImageRGB *imagem);
 
-void salvarImagemGray(ImageGray *imagem, char *caminho, char *nome);
+void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png);
 void salvarImagemRGB(ImageRGB *imagem);
 
 
@@ -97,10 +115,12 @@ ImageRGB *transpose_rgb(const ImageRGB *image);
 // Manipulação por pixel para ImageGray
 ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height);
 ImageGray *median_blur_gray(const ImageGray *image, int kernel_size);
+ImageGray *negativo_gray(const ImageGray *image);
 
 // Manipulação por pixel para ImageRGB
 ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height);
 ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size);
+ImageRGB *negativo_rgb(const ImageRGB *image);
 
 ////////////////////////////////////////////////////////////
 
