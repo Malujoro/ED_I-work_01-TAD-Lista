@@ -4,7 +4,8 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
-#include <python3.12/Python.h> // API para utilizar o python em C
+#include <python3.10/Python.h> // API para utilizar o python em C
+#include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
 
 #define SCRIPT 0
 #define FUNCAO 1
@@ -645,20 +646,182 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 
 // // Operações para ImageGray
 
-// ImageGray *flip_vertical_gray(ImageGray *image)
-// {
+ImageGray *flip_vertical_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipV = (ImageGray *)malloc(sizeof(ImageGray));
+    if (imageFlipV == NULL){
+        printf("Falha a alocar memoria para imagem flip vertical.\n");
+        return NULL;
+    }
 
-// }
+    imageFlipV->dim.altura = image->dim.altura;
+    imageFlipV->dim.largura = image->dim.largura;
 
-// ImageGray *flip_horizontal_gray(ImageGray *image)
-// {
+    imageFlipV->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
+    if (imageFlipV->pixels == NULL){
+        printf("Falha ao alocar memoria para pixels flip vertical.\n");
+        free(imageFlipV);
+        return NULL;
+    }
 
-// }
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipV->pixels[(image->dim.largura * i) + j] = image->pixels[(image->dim.largura * (image->dim.altura - i - 1)) + j];
+        }
+    }
 
-// ImageGray *transpose_gray(const ImageGray *image)
-// {
+    return imageFlipV;
+}
 
-// }
+ImageGray *flip_horizontal_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipH = (ImageGray *)malloc(sizeof(ImageGray));
+    if (imageFlipH == NULL){
+        printf("Falha ao alocar memoria para imagem flip horizontal.\n");
+        return NULL;
+    }
+
+    imageFlipH->dim.altura = image->dim.altura;
+    imageFlipH->dim.largura = image->dim.largura;
+
+    imageFlipH->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
+    if (imageFlipH->pixels == NULL){
+        printf("Erro ao alocar memoria para pixels flip horizontal.\n");
+        free(imageFlipH);
+        return NULL;
+    }
+
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipH->pixels[(image->dim.largura * i) + j] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
+        }
+    }
+
+    return imageFlipH;
+}
+
+
+int menuRotate(){
+    int op;
+    setlocale(LC_ALL,"");
+
+    printf("Menu de opções de Rotate:\n");
+    do{
+        printf("1- Rotacionar no sentido horário 🔁\n");  //\U0001F504
+        printf("2- Rotacionar no sentido anti-horário 🔄\n");  //\U0001F504
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while(getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while(1);
+
+    return op;  
+}
+
+ImageGray *rotate_90_gray(const ImageGray *image)
+{
+    ImageGray *imageRotate = (ImageGray *)malloc(sizeof(ImageGray));
+    if (imageRotate == NULL){
+        printf("Falha ao alocar memória para a imagem rotacionada.\n");
+        return NULL;
+    }
+
+    imageRotate->dim.altura = image->dim.largura;
+    imageRotate->dim.largura = image->dim.altura;
+
+    imageRotate->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
+    if (imageRotate->pixels == NULL){
+        printf("Falha ao alocar memória para pixels Rotate.\n");
+        free(imageRotate);
+        return NULL;
+    }
+
+    int op = menuRotate();
+
+    switch(op){
+        case 1:
+            //Rotacionar no sentido horário:
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[j * imageRotate->dim.largura + (imageRotate->dim.largura - 1 - i)] = image->pixels[i * image->dim.largura + j];
+            }
+            break;
+        case 2:
+            //Rotacionar no sentido anti horário
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[(imageRotate->dim.altura * imageRotate->dim.largura + i) - imageRotate->dim.largura * (j + 1)] = image->pixels[i * image->dim.largura + j];
+            }
+            break;
+    }
+
+    return imageRotate;
+}
+
+
+int menuTranspose(){
+    setlocale(LC_ALL,"");
+
+    int op;
+
+    printf("Menu de opções de transpose:\n");
+    do{
+        printf("1- Transpose ↗️\n");  //\u2197
+        printf("2- Transpose ↘️\n");  //\u2198
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while (getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while (1);
+
+    return op;
+}
+
+ImageGray *transpose_gray(const ImageGray *image)
+{
+    ImageGray *imageTranspose = (ImageGray *)malloc(sizeof(ImageGray));
+    if (imageTranspose == NULL){
+        printf("Falha ao alocar memoria para imagem transpose.\n");
+        return NULL;
+    }
+
+    imageTranspose->dim.altura = image->dim.largura;
+    imageTranspose->dim.largura = image->dim.altura;
+
+    imageTranspose->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
+    if (imageTranspose->pixels == NULL){
+        printf("Falha ao alocar memoria para pixels transpose.\n");
+        free(imageTranspose);
+        return NULL;
+    }
+
+    int op = menuTranspose();
+
+    switch (op){
+        case 1:
+            //Transpose - inverte diagonais direita superior e esqueda inferior
+            for(int i = 0; i < image->dim.altura; i++){
+            for(int j = 0; j < image->dim.largura; j++)
+                imageTranspose->pixels[(image->dim.altura * j) + i] = image->pixels[(image->dim.largura * i) + j];
+            }
+            break;
+        case 2:
+            //Transpose - inverte diagonais esquerda superior e direita inferior
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageTranspose->pixels[(image->dim.largura - j - 1) * image->dim.altura + (image->dim.altura - i - 1)] = image->pixels[(image->dim.largura * i) + j];
+            }
+            break;
+    }
+    
+    return imageTranspose;
+}
 
 
 // // Operações para ImageRGB
@@ -668,6 +831,11 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 // }
 
 // ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
+// {
+
+// }
+
+// ImageRGB *rotate_90_rgb(const ImageRGB *image)
 // {
 
 // }
