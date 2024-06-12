@@ -4,7 +4,8 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
-#include <python3.12/Python.h> // API para utilizar o python em C
+#include <python3.10/Python.h> // API para utilizar o python em C
+#include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
 
 #define SCRIPT 0
 #define FUNCAO 1
@@ -645,20 +646,126 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 
 // // Operações para ImageGray
 
-// ImageGray *flip_vertical_gray(ImageGray *image)
-// {
+ImageGray *flip_vertical_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipV = create_image_gray(image->dim.largura, image->dim.altura);
 
-// }
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipV->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[posicaoVetor(image->dim.largura, (image->dim.altura - i - 1), j)];
+        }
+    }
 
-// ImageGray *flip_horizontal_gray(ImageGray *image)
-// {
+    return imageFlipV;
+}
 
-// }
+ImageGray *flip_horizontal_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipH = create_image_gray(image->dim.largura, image->dim.altura);
 
-// ImageGray *transpose_gray(const ImageGray *image)
-// {
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipH->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
+        }
+    }
 
-// }
+    return imageFlipH;
+}
+
+
+int menuRotate(){
+    int op;
+    setlocale(LC_ALL,"");
+
+    printf("Menu de opções de Rotate:\n");
+    do{
+        printf("1- Rotacionar no sentido horário 🔁\n");  //\U0001F504
+        printf("2- Rotacionar no sentido anti-horário 🔄\n");  //\U0001F504
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while(getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while(1);
+
+    return op;  
+}
+
+ImageGray *rotate_90_gray(const ImageGray *image)
+{
+    ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
+
+    int op = menuRotate();
+
+    switch(op){
+        case 1:
+            //Rotacionar no sentido horário:
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+        case 2:
+            //Rotacionar no sentido anti horário
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+    }
+
+    return imageRotate;
+}
+
+
+int menuTranspose(){
+    setlocale(LC_ALL,"");
+
+    int op;
+
+    printf("Menu de opções de transpose:\n");
+    do{
+        printf("1- Transpose ↗️\n");  //\u2197
+        printf("2- Transpose ↘️\n");  //\u2198
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while (getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while (1);
+
+    return op;
+}
+
+ImageGray *transpose_gray(const ImageGray *image)
+{
+    ImageGray *imageTranspose = create_image_gray(image->dim.altura, image->dim.largura);
+
+    int op = menuTranspose();
+
+    switch (op){
+        case 1:
+            //Transpose - inverte diagonais direita superior e esqueda inferior
+            for(int i = 0; i < image->dim.altura; i++){
+            for(int j = 0; j < image->dim.largura; j++)
+                imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+        case 2:
+            //Transpose - inverte diagonais esquerda superior e direita inferior
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+    }
+    
+    return imageTranspose;
+}
 
 
 // // Operações para ImageRGB
@@ -668,6 +775,11 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 // }
 
 // ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
+// {
+
+// }
+
+// ImageRGB *rotate_90_rgb(const ImageRGB *image)
 // {
 
 // }
