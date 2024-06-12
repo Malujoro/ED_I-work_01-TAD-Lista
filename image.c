@@ -648,25 +648,11 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 
 ImageGray *flip_vertical_gray(const ImageGray *image)
 {
-    ImageGray *imageFlipV = (ImageGray *)malloc(sizeof(ImageGray));
-    if (imageFlipV == NULL){
-        printf("Falha a alocar memoria para imagem flip vertical.\n");
-        return NULL;
-    }
-
-    imageFlipV->dim.altura = image->dim.altura;
-    imageFlipV->dim.largura = image->dim.largura;
-
-    imageFlipV->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
-    if (imageFlipV->pixels == NULL){
-        printf("Falha ao alocar memoria para pixels flip vertical.\n");
-        free(imageFlipV);
-        return NULL;
-    }
+    ImageGray *imageFlipV = create_image_gray(image->dim.largura, image->dim.altura);
 
     for(int i = 0; i < image->dim.altura; i++){
         for(int j = 0; j < image->dim.largura; j++){
-            imageFlipV->pixels[(image->dim.largura * i) + j] = image->pixels[(image->dim.largura * (image->dim.altura - i - 1)) + j];
+            imageFlipV->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[posicaoVetor(image->dim.largura, (image->dim.altura - i - 1), j)];
         }
     }
 
@@ -675,25 +661,11 @@ ImageGray *flip_vertical_gray(const ImageGray *image)
 
 ImageGray *flip_horizontal_gray(const ImageGray *image)
 {
-    ImageGray *imageFlipH = (ImageGray *)malloc(sizeof(ImageGray));
-    if (imageFlipH == NULL){
-        printf("Falha ao alocar memoria para imagem flip horizontal.\n");
-        return NULL;
-    }
-
-    imageFlipH->dim.altura = image->dim.altura;
-    imageFlipH->dim.largura = image->dim.largura;
-
-    imageFlipH->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
-    if (imageFlipH->pixels == NULL){
-        printf("Erro ao alocar memoria para pixels flip horizontal.\n");
-        free(imageFlipH);
-        return NULL;
-    }
+    ImageGray *imageFlipH = create_image_gray(image->dim.largura, image->dim.altura);
 
     for(int i = 0; i < image->dim.altura; i++){
         for(int j = 0; j < image->dim.largura; j++){
-            imageFlipH->pixels[(image->dim.largura * i) + j] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
+            imageFlipH->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
         }
     }
 
@@ -723,21 +695,7 @@ int menuRotate(){
 
 ImageGray *rotate_90_gray(const ImageGray *image)
 {
-    ImageGray *imageRotate = (ImageGray *)malloc(sizeof(ImageGray));
-    if (imageRotate == NULL){
-        printf("Falha ao alocar memória para a imagem rotacionada.\n");
-        return NULL;
-    }
-
-    imageRotate->dim.altura = image->dim.largura;
-    imageRotate->dim.largura = image->dim.altura;
-
-    imageRotate->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
-    if (imageRotate->pixels == NULL){
-        printf("Falha ao alocar memória para pixels Rotate.\n");
-        free(imageRotate);
-        return NULL;
-    }
+    ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
 
     int op = menuRotate();
 
@@ -746,14 +704,14 @@ ImageGray *rotate_90_gray(const ImageGray *image)
             //Rotacionar no sentido horário:
             for(int i = 0; i < image->dim.altura; i++){
                 for(int j = 0; j < image->dim.largura; j++)
-                    imageRotate->pixels[j * imageRotate->dim.largura + (imageRotate->dim.largura - 1 - i)] = image->pixels[i * image->dim.largura + j];
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
             }
             break;
         case 2:
             //Rotacionar no sentido anti horário
             for(int i = 0; i < image->dim.altura; i++){
                 for(int j = 0; j < image->dim.largura; j++)
-                    imageRotate->pixels[(imageRotate->dim.altura * imageRotate->dim.largura + i) - imageRotate->dim.largura * (j + 1)] = image->pixels[i * image->dim.largura + j];
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
             }
             break;
     }
@@ -785,21 +743,7 @@ int menuTranspose(){
 
 ImageGray *transpose_gray(const ImageGray *image)
 {
-    ImageGray *imageTranspose = (ImageGray *)malloc(sizeof(ImageGray));
-    if (imageTranspose == NULL){
-        printf("Falha ao alocar memoria para imagem transpose.\n");
-        return NULL;
-    }
-
-    imageTranspose->dim.altura = image->dim.largura;
-    imageTranspose->dim.largura = image->dim.altura;
-
-    imageTranspose->pixels = (PixelGray *)malloc((image->dim.largura * image->dim.altura) * sizeof(PixelGray));
-    if (imageTranspose->pixels == NULL){
-        printf("Falha ao alocar memoria para pixels transpose.\n");
-        free(imageTranspose);
-        return NULL;
-    }
+    ImageGray *imageTranspose = create_image_gray(image->dim.altura, image->dim.largura);
 
     int op = menuTranspose();
 
@@ -808,14 +752,14 @@ ImageGray *transpose_gray(const ImageGray *image)
             //Transpose - inverte diagonais direita superior e esqueda inferior
             for(int i = 0; i < image->dim.altura; i++){
             for(int j = 0; j < image->dim.largura; j++)
-                imageTranspose->pixels[(image->dim.altura * j) + i] = image->pixels[(image->dim.largura * i) + j];
+                imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
             }
             break;
         case 2:
             //Transpose - inverte diagonais esquerda superior e direita inferior
             for(int i = 0; i < image->dim.altura; i++){
                 for(int j = 0; j < image->dim.largura; j++)
-                    imageTranspose->pixels[(image->dim.largura - j - 1) * image->dim.altura + (image->dim.altura - i - 1)] = image->pixels[(image->dim.largura * i) + j];
+                    imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
             }
             break;
     }

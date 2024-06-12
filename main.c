@@ -15,8 +15,8 @@ int main()
     char *png = gerarCaminho(caminho, ".", "png");
 
     
-    // ImageGray *imagem = lerImagemGray(imagemOriginal, txtOriginal);
-    ImageGray *imagem = lerTxtGray(txtOriginal);
+    ImageGray *imagem = lerImagemGray(imagemOriginal, txtOriginal);
+    //ImageGray *imagem = lerTxtGray(txtOriginal);
     // imagem = median_blur_gray(imagem, 7);
     // imagem = clahe_gray(imagem, 64, 128);
     //imagem = negativo_gray(imagem);
