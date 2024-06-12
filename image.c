@@ -10,7 +10,7 @@
 #define FUNCAO 1
 #define ARGUMENTOS 2
 
-int clip_limit = 30;
+int clip_limit = 40;
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -99,7 +99,6 @@ float *alocarFloat(int tam)
 
     return vetor;
 }
-
 
 PyObject **alocarPython(int tam)
 {
@@ -431,6 +430,7 @@ int posMenor(int *histograma)
     return posicao;
 }
 
+// TODO RGB futuro
 void suavizaLinhaGray(ImageGray *image, int height)
 {
     float media, pixel1, pixel2;
@@ -459,66 +459,136 @@ void suavizaLinhaGray(ImageGray *image, int height)
     }
 }
 
-float interpolacaoLinear(int x1, int x2, int x, int valor1, int valor2)
+float interpolacaoBilinear(int i1, int j1, int i2, int j2, int *ponto, int width, int height, float peso[][height])
 {
-    float ponto1, ponto2;
-    ponto1 = ((float) (x2 - x)) / (x2 - x1) * valor1;
-    ponto2 = ((float) (x - x1)) / (x2 - x1) * valor2;
-    return ponto1 + ponto2;
-}
+    float valorI = 0, valorJ = 0;
 
-int interpolacaoBilinear(int x1, int y1, int x2, int y2, int x, int y, int valores[][2])
-{
-    // float ponto1, ponto2, ponto3, ponto4;
-    float r1, r2, div = (y2 - y);
+    // if(i1 != i2)
+        // valorI = ((float) (i - i1)) / (i2 - i1);
+        // valorI = ((float) (i - i1)) / (i2 - i1) + (float) (i % height) / height;
+        // valorI = ((float) (i - i1)) / (i2 - i1) + (float) (i % height) / height;
 
-    r1 = interpolacaoLinear(x1, x2, x, valores[0][0], valores[0][1]);
-    r2 = interpolacaoLinear(x1, x2, x, valores[1][0], valores[1][1]);
+    // if(j1 != j2)
+        // valorJ = ((float) (j - j1)) / (j2 - j1);
+        // valorJ = ((float) (j - j1)) / (j2 - j1) + (float) (j % width) / width;
+        // valorJ = ((float) (j - j1)) / (j2 - j1) + (float) (j % width) / width;
+
+    // if(i1 == i2)
+        // return (1 - valorJ) * ponto[0] + valorJ * ponto[1];
     
-    int ponto1 = (float)(y2 - y1) / div * r1;
-    int ponto2 = (float)(y - y1) / div * r2;
+    // if(j1 == j2)
+        // return (1 - valorI) * ponto[1] + valorI * ponto[3];
 
-    return ponto1 + ponto2;
-    // return ponto1 + ponto2 + ponto3 + ponto4;
+    // int height2 = height - 1;
+    // int width2 = width - 1;
 
+    // float valor = (1 - valorJ) * (1 - valorI) * (ponto[0] + peso[i % height][j % width]);
+    // valor += valorJ * (1 - valorI) * (ponto[1] + peso[i % height][width2 - j % width]);
+    // valor += (1 - valorJ) * valorI * (ponto[2] + peso[height2 - i % height][j % width]);
+    // valor += valorJ * valorI * (ponto[3] + peso[height2 - i % height][width2 - j % width]);
+
+    int posTileI = i1 % height, posTileJ = j1 % width;
+
+    // valorI = (float) 1 / distanciaPontos(posTileI, posTileJ, height, posTileJ);
+    // valorJ = (float) 1 / distanciaPontos(posTileI, posTileJ, posTileI, width);
+
+    float valor = (1 - valorJ) * (1 - valorI) * ponto[0];
+    valor += valorJ * (1 - valorI) * ponto[1];
+    valor += (1 - valorJ) * valorI * ponto[2];
+    valor += valorJ * valorI * ponto[3];
+
+    // float valor = (1 - valorJ) * (1 - valorI) * ponto[0];
+    // valor += valorJ * (1 - valorI) * ponto[1];
+    // valor += (1 - valorJ) * valorI * ponto[2];
+    // valor += valorJ * valorI * ponto[3];
+
+    return valor;
 }
 
-void suavizaGray(ImageGray *image)
+float interpolacaoBilinear2(float x, float y, int ponto[][2])
 {
-    int valores[2][2];
+    // float valor = (1 - y) * ((1 - x) * ponto[0][0] + x * ponto[0][1]);
+    // valor += y * ((1 - x) * ponto[1][0] + x * ponto[1][1]);
 
-    // Suaviza a primeira e última linha (X) com interpolação linear
-    for(int i = 1; i < image->dim.largura; i++)
+    // float valor = (1 - y) * ((1 - x) * ponto[1][1] + x * ponto[1][0]);
+    // valor += y * ((1 - x) * ponto[0][1] + x * ponto[0][0]);
+    // return valor;
+
+    float valor1, valor2, valor3, valor4;
+    valor1 = y * x * ponto[0][0];
+    valor2 = y * (1 - x) * ponto[0][1];
+    valor3 = (1 - y) * x * ponto[1][0];
+    valor4 = (1 - y) * (1 - x) * ponto[1][1];
+    return valor1 + valor2 + valor3 + valor4;
+
+    // float valor = (1 - x) * (1 - y) * ponto[0][0] + x * (1 - y) * ponto[0][1] + (1 - x) * y * ponto[1][0] + x * y * ponto[1][1];
+}
+
+void suavizaGray(ImageGray *image, int width, int height)
+{
+    float peso[height][width];
+    int menor = height;
+
+    if(width < height)
+        menor = width;
+
+    int posI = height-1;
+    int posJ = width-1;
+    
+    // Cria uma matriz com os "pesos" de cada posição (referente as bordas)
+    for(int i = menor; i > 0; i--, posI--, posJ--)
     {
-        for(int j = 0; j < image->dim.altura; j+= image->dim.altura-1)
-        {
-            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, j, i-1)].value;
-            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, j, i+1)].value;
-            image->pixels[posicaoVetor(image->dim.largura, j, i)].value = interpolacaoLinear(j-1, j+1, j, valores[0][0], valores[0][1]);
-        }
+        for(int k = 0; k <= posJ; k++)
+            peso[posI][k] = (float) i / menor;
+
+        for(int k = 0; k <= posI; k++)
+            peso[k][posJ] = (float) i / menor;
     }
 
-    // Suaviza a primeira e última coluna (Y) com interpolação linear
-    for(int i = 1; i < image->dim.altura; i++)
+    int ponto[4];
+    for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
     {
-        for(int j = 0; j < image->dim.largura; j+= image->dim.largura-1)
+        if(i2 >= image->dim.altura)
+            i2 = i;
+
+        for(int j = 0, j2 = width; j < image->dim.largura; j++, j2++)
         {
-            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, i+1, j)].value;
-            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, i-1, j)].value;
-            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoLinear(i+1, i-1, i, valores[0][0], valores[0][1]);
+            if(j2 >= image->dim.largura)
+                j2 = j;
+
+            ponto[0] = image->pixels[posicaoVetor(image->dim.largura, i, j)].value;
+            ponto[1] = image->pixels[posicaoVetor(image->dim.largura, i, j2)].value;
+            ponto[2] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
+            ponto[3] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear(i, j, i2, j2, ponto, width, height, peso);
         }
     }
+}
 
-    // Suaviza a imagem inteira com interpolação bilinear
-    for(int i = 1; i < image->dim.altura-1; i++)
+void suavizaGray2(ImageGray *image, int width, int height)
+{
+    int ponto[2][2];
+    float x, y;
+
+    for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
     {
-        for(int j = 1; j < image->dim.largura-1; j++)
+        if(i2 >= image->dim.altura)
+            i2 = i;
+            
+        for(int j = 0, j2 = width; j < image->dim.largura; j++, j2++)
         {
-            valores[0][0] = image->pixels[posicaoVetor(image->dim.largura, i+1, j-1)].value;
-            valores[0][1] = image->pixels[posicaoVetor(image->dim.largura, i+1, j+1)].value;
-            valores[1][0] = image->pixels[posicaoVetor(image->dim.largura, i-1, j-1)].value;
-            valores[1][1] = image->pixels[posicaoVetor(image->dim.largura, i-1, j+1)].value;
-            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear(j-1, i+1, j+1, i-1, j, i, valores) % 256;
+            if(j2 >= image->dim.largura)
+                j2 = j;
+
+            ponto[0][0] = image->pixels[posicaoVetor(image->dim.largura, i, j)].value;
+            ponto[0][1] = image->pixels[posicaoVetor(image->dim.largura, i, j2)].value;
+            ponto[1][0] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
+            ponto[1][1] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
+            
+            y = ((float) ((i % height) + 1) / height);
+            x = ((float) ((j % width) + 1) / width);
+
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear2(x, y, ponto);
         }
     }
 }
@@ -554,7 +624,7 @@ void suavizaColunaGray(ImageGray *image, int width)
 ////////////// Funções de criação e liberação //////////////
 
 // Funções para criar a variável de imagem
-ImageGray *create_image_gray(int largura, int altura)
+ImageGray *create_image_gray(int largura, int altura) 
 {
     ImageGray *imagem = (ImageGray *) malloc(sizeof(ImageGray));
 
@@ -822,7 +892,8 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 
     // suavizaColunaGray(resultado, tile_width);
     // suavizaLinhaGray(resultado, tile_height);
-    suavizaGray(resultado);
+    // suavizaGray(resultado, tile_width, tile_height);
+    suavizaGray2(resultado, tile_width, tile_height);
 
     return resultado;
 }
