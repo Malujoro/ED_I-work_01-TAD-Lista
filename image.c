@@ -520,8 +520,6 @@ float interpolacaoBilinear2(float x, float y, int ponto[][2])
     valor3 = (1 - y) * x * ponto[1][0];
     valor4 = (1 - y) * (1 - x) * ponto[1][1];
     return valor1 + valor2 + valor3 + valor4;
-
-    // float valor = (1 - x) * (1 - y) * ponto[0][0] + x * (1 - y) * ponto[0][1] + (1 - x) * y * ponto[1][0] + x * y * ponto[1][1];
 }
 
 void suavizaGray(ImageGray *image, int width, int height)
@@ -569,6 +567,7 @@ void suavizaGray2(ImageGray *image, int width, int height)
 {
     int ponto[2][2];
     float x, y;
+    int restoI, restoJ;
 
     for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
     {
@@ -585,8 +584,17 @@ void suavizaGray2(ImageGray *image, int width, int height)
             ponto[1][0] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
             ponto[1][1] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
             
-            y = ((float) ((i % height) + 1) / height);
-            x = ((float) ((j % width) + 1) / width);
+            // y = ((float) (i % height) / height);
+            // x = ((float) (j % width) / width);
+
+            // restoI = i / (height+1) + 1;
+            // restoJ = j / (width+1) + 1;
+
+            restoI = (float) i / height + 1;
+            restoJ = (float) j / width + 1;
+
+            y = (float) i / (restoI * height);
+            x = (float) j / (restoJ * width);
 
             image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear2(x, y, ponto);
         }
