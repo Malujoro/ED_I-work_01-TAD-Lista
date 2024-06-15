@@ -346,6 +346,16 @@ int mediana(int *vetor, int tam)
 
 //////////// Auxiliar Clahe ////////////
 
+int calculaCaixa(int eixo, int tile_eixo)
+{
+    int caixa = eixo / tile_eixo;
+
+    if(eixo % tile_eixo != 0)
+        caixa++;
+
+    return caixa;
+}
+
 int cdf(int *vetor, int pos)
 {
     int soma = 0;
@@ -384,11 +394,11 @@ void redistribuirHistograma(int *histograma)
 
         // Blindagem contra looping infinito (impossível de redistribuir)
         if(quant == 0)
-            limite = 0;
+            break;
 
         // Distribuir os valores igualmente
         // Efetua a redistribuição se for possível adicionar no mínimo 1 pixel em cada coluna
-        if(limite && soma >= 256)
+        if(soma >= 256)
         {
             for(int i = 0; i < 256; i++)
             {
@@ -400,7 +410,7 @@ void redistribuirHistograma(int *histograma)
             soma = ((soma / quant) - ((int) soma / quant)) * quant;
         }
         // Caso possua menos que 256 pixels, eles serão adicionados na menor coluna
-        else if(limite)
+        else
         {
             histograma[posMenor(histograma)] += soma;
             soma = 0;
@@ -584,17 +594,17 @@ void suavizaGray2(ImageGray *image, int width, int height)
             ponto[1][0] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
             ponto[1][1] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
             
-            // y = ((float) (i % height) / height);
-            // x = ((float) (j % width) / width);
+            y = ((float) (i % height) / height);
+            x = ((float) (j % width) / width);
 
             // restoI = i / (height+1) + 1;
             // restoJ = j / (width+1) + 1;
 
-            restoI = (float) i / height + 1;
-            restoJ = (float) j / width + 1;
+            // restoI = (float) i / height + 1;
+            // restoJ = (float) j / width + 1;
 
-            y = (float) i / (restoI * height);
-            x = (float) j / (restoJ * width);
+            // y = (float) i / (restoI * height);
+            // x = (float) j / (restoJ * width);
 
             image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear2(x, y, ponto);
         }
@@ -848,13 +858,8 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 {
     int caixaX, caixaY;
 
-    caixaX = image->dim.largura / tile_width;
-    if(image->dim.largura % tile_width != 0)
-        caixaX++;
-
-    caixaY = image->dim.altura / tile_height;
-    if(image->dim.altura % tile_height != 0)
-        caixaY++;
+    caixaX = calculaCaixa(image->dim.largura, tile_width);
+    caixaY = calculaCaixa(image->dim.altura, tile_height);
 
     ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
     int tamVet = tile_height * tile_width;
@@ -901,7 +906,7 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
     // suavizaColunaGray(resultado, tile_width);
     // suavizaLinhaGray(resultado, tile_height);
     // suavizaGray(resultado, tile_width, tile_height);
-    suavizaGray2(resultado, tile_width, tile_height);
+    // suavizaGray2(resultado, tile_width, tile_height);
 
     return resultado;
 }
