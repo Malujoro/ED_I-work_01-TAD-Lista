@@ -87,6 +87,34 @@ int *alocarInt(int tam)
     return vetor;
 }
 
+int ***alocarMatrizInt3(int lin, int col, int prof)
+{
+    int ***matriz = (int ***) malloc(lin * sizeof(int **));
+
+    if(!matriz)
+    {
+        printf("Erro ao alocar matriz");
+        exit(EXIT_FAILURE);
+    }
+
+    for(int i = 0; i < lin; i++)
+    {
+        matriz[i] = (int **) malloc(col * sizeof(int *));
+
+        if(!matriz[i])
+        {
+            printf("Erro ao alocar matriz");
+            exit(EXIT_FAILURE);
+        }
+
+        for(int j = 0; j < col; j++)
+            matriz[i][j] = alocarInt(prof);
+
+    }
+
+    return matriz;
+}
+
 float *alocarFloat(int tam)
 {
     float *vetor = (float *) calloc(tam, sizeof(float));
@@ -105,19 +133,8 @@ PyObject **alocarPython(int tam)
     PyObject **matriz = (PyObject **) malloc(tam * sizeof(PyObject *));
 
     if(matriz != NULL)
-    {
-        // for(int i = 0; i < tam; i++)
-        // {
-        //     matriz[i] = (PyObject *) malloc(sizeof(PyObject));
-
-        //     if(!matriz[i])
-        //     {
-        //         printf("Erro ao alocar PyObject");
-        //         exit(EXIT_FAILURE);
-        //     }        
-        // }
         return matriz;
-    }
+
     printf("Erro ao alocar PyObject");
     exit(EXIT_FAILURE);
 }
@@ -151,6 +168,22 @@ PixelGray *alocarPixelGray(int tam)
 void *liberarVetor(void *vetor)
 {
     free(vetor);
+    return NULL;
+}
+
+void *liberarMatrizInt3(int ***matriz, int lin, int col)
+{
+    for(int i = 0; i < lin; i++)
+    {
+        for(int j = 0; j < col; j++)
+        {
+            free(matriz[i][j]);
+            matriz[i][j] = NULL;
+        }
+        free(matriz[i]);
+        matriz[i] = NULL;
+    }
+    free(matriz);
     return NULL;
 }
 
@@ -369,6 +402,23 @@ int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max)
     return ((float) (cdf_i - cdf_min)) / (cdf_max - cdf_min) * 255;
 }
 
+int normaliza_histograma(int *histograma, int *resultado)
+{
+    int minimo = cdf(histograma, posMinimo(histograma));
+    int maximo = cdf(histograma, 255);
+
+    if(maximo != minimo)
+    {
+        for(int i = 0, ac = 0; i < 256; i++)
+        {
+            ac += histograma[i];
+            resultado[i] = cdf_normalizado(ac, minimo, maximo);
+        }
+        return 1;
+    }
+    return 0;
+}
+
 void redistribuirHistograma(int *histograma)
 {
     int *aux = alocarInt(256);
@@ -524,12 +574,17 @@ float interpolacaoBilinear2(float x, float y, int ponto[][2])
     // valor += y * ((1 - x) * ponto[0][1] + x * ponto[0][0]);
     // return valor;
 
-    float valor1, valor2, valor3, valor4;
-    valor1 = y * x * ponto[0][0];
-    valor2 = y * (1 - x) * ponto[0][1];
-    valor3 = (1 - y) * x * ponto[1][0];
-    valor4 = (1 - y) * (1 - x) * ponto[1][1];
-    return valor1 + valor2 + valor3 + valor4;
+    // float valor1, valor2, valor3, valor4;
+    // valor1 = y * x * ponto[0][0];
+    // valor2 = y * (1 - x) * ponto[0][1];
+    // valor3 = (1 - y) * x * ponto[1][0];
+    // valor4 = (1 - y) * (1 - x) * ponto[1][1];
+    // return valor1 + valor2 + valor3 + valor4;
+
+    return y * x * ponto[0][0]
+    + y * (1 - x) * ponto[0][1]
+    + (1 - y) * x * ponto[1][0]
+    + (1 - y) * (1 - x) * ponto[1][1];
 }
 
 void suavizaGray(ImageGray *image, int width, int height)
@@ -573,38 +628,44 @@ void suavizaGray(ImageGray *image, int width, int height)
     }
 }
 
-void suavizaGray2(ImageGray *image, int width, int height)
+void suavizaGray2(ImageGray *image, int ***histogramas, int width, int height)
 {
     int ponto[2][2];
     float x, y;
-    int restoI, restoJ;
+    int caixaI, caixaJ, caixaI2, caixaJ2, valor;
 
     for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
     {
         if(i2 >= image->dim.altura)
             i2 = i;
             
+        caixaI = i / height;
+        caixaI2 = i2 / height;
+
         for(int j = 0, j2 = width; j < image->dim.largura; j++, j2++)
         {
             if(j2 >= image->dim.largura)
                 j2 = j;
 
-            ponto[0][0] = image->pixels[posicaoVetor(image->dim.largura, i, j)].value;
-            ponto[0][1] = image->pixels[posicaoVetor(image->dim.largura, i, j2)].value;
-            ponto[1][0] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
-            ponto[1][1] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
+            caixaJ = j / width;
+            caixaJ2 = j2 / width;
+
+            valor = image->pixels[posicaoVetor(image->dim.largura, i, j)].value;
+
+            ponto[0][0] = histogramas[caixaI][caixaJ][valor];
+            ponto[0][1] = histogramas[caixaI][caixaJ2][valor];
+            ponto[1][0] = histogramas[caixaI2][caixaJ][valor];
+            ponto[1][1] = histogramas[caixaI2][caixaJ2][valor];
             
             y = ((float) (i % height) / height);
             x = ((float) (j % width) / width);
 
-            // restoI = i / (height+1) + 1;
-            // restoJ = j / (width+1) + 1;
+            // caixaI = i / (height+1) + 1;
+            // caixaJ = j / (width+1) + 1;
 
-            // restoI = (float) i / height + 1;
-            // restoJ = (float) j / width + 1;
 
-            // y = (float) i / (restoI * height);
-            // x = (float) j / (restoJ * width);
+            // y = (float) i / (caixaI * height);
+            // x = (float) j / (caixaJ * width);
 
             image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear2(x, y, ponto);
         }
@@ -864,6 +925,7 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
     ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
     int tamVet = tile_height * tile_width;
     int *vetor = alocarInt(tamVet);
+    int ***histogramas = alocarMatrizInt3(caixaY, caixaX, 256);
     int *histograma = alocarInt(256);
     for(int a = 0; a < caixaY; a++)
     {
@@ -882,20 +944,15 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 
             redistribuirHistograma(histograma);
 
-            // Encontrar mínimo e máximo
-            int minimo = cdf(histograma, posMinimo(histograma));
-            int maximo = tile_width * tile_height;
-
             // Remapeia todo o bloco
-            if(maximo != minimo)
+            if(normaliza_histograma(histograma, histogramas[a][b]))
             {
                 for(int i = 0, tam = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
                 {
                     for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
-                        resultado->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value = cdf_normalizado(cdf(histograma, vetor[tam]), minimo, maximo);
+                        resultado->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value = histogramas[a][b][vetor[tam]];
                 }
             }
-
             limparVet(vetor, tam);
             limparVet(histograma, 256);
         }
@@ -906,7 +963,8 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
     // suavizaColunaGray(resultado, tile_width);
     // suavizaLinhaGray(resultado, tile_height);
     // suavizaGray(resultado, tile_width, tile_height);
-    // suavizaGray2(resultado, tile_width, tile_height);
+    suavizaGray2(resultado, histogramas, tile_width, tile_height);
+    histogramas = liberarMatrizInt3(histogramas, caixaY, caixaX);
 
     return resultado;
 }
