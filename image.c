@@ -10,7 +10,6 @@
 #define FUNCAO 1
 #define ARGUMENTOS 2
 
-int clip_limit = 40;
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
 
@@ -379,7 +378,7 @@ int mediana(int *vetor, int tam)
 
 //////////// Auxiliar Clahe ////////////
 
-int calculaCaixa(int eixo, int tile_eixo)
+int calculaCaixas(int eixo, int tile_eixo)
 {
     int caixa = eixo / tile_eixo;
 
@@ -419,7 +418,7 @@ int normaliza_histograma(int *histograma, int *resultado)
     return 0;
 }
 
-void redistribuirHistograma(int *histograma)
+void redistribuirHistograma(int *histograma, int clip_limit)
 {
     int *aux = alocarInt(256);
     int limite, quant = 256;
@@ -490,145 +489,15 @@ int posMenor(int *histograma)
     return posicao;
 }
 
-// TODO RGB futuro
-void suavizaLinhaGray(ImageGray *image, int height)
+float interpolacaoBilinear(float x, float y, int ponto[][2])
 {
-    float media, pixel1, pixel2;
-    int aux1, aux2;
-    int quant = image->dim.altura / height;
-    
-    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
-    if(image->dim.altura % height == 0)
-        quant--;
-
-    aux1 = height - 1;
-    aux2 = height;
-
-    for(int i = 0; i < quant; i++)
-    {
-        for(int j = 0; j < image->dim.largura; j++)
-        {
-            pixel1 = image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value;
-            pixel2 = image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value;
-            media = (pixel1 + pixel2) / 2;
-            image->pixels[posicaoVetor(image->dim.largura, aux1, j)].value = media;
-            image->pixels[posicaoVetor(image->dim.largura, aux2, j)].value = media;
-        }
-        aux1 += height;
-        aux2 += height;
-    }
+    return (1 - y) * (1 - x) * ponto[0][0]
+    + (1 - y) * x * ponto[0][1]
+    + y * (1 - x) * ponto[1][0]
+    + y * x * ponto[1][1];
 }
 
-float interpolacaoBilinear(int i1, int j1, int i2, int j2, int *ponto, int width, int height, float peso[][height])
-{
-    float valorI = 0, valorJ = 0;
-
-    // if(i1 != i2)
-        // valorI = ((float) (i - i1)) / (i2 - i1);
-        // valorI = ((float) (i - i1)) / (i2 - i1) + (float) (i % height) / height;
-        // valorI = ((float) (i - i1)) / (i2 - i1) + (float) (i % height) / height;
-
-    // if(j1 != j2)
-        // valorJ = ((float) (j - j1)) / (j2 - j1);
-        // valorJ = ((float) (j - j1)) / (j2 - j1) + (float) (j % width) / width;
-        // valorJ = ((float) (j - j1)) / (j2 - j1) + (float) (j % width) / width;
-
-    // if(i1 == i2)
-        // return (1 - valorJ) * ponto[0] + valorJ * ponto[1];
-    
-    // if(j1 == j2)
-        // return (1 - valorI) * ponto[1] + valorI * ponto[3];
-
-    // int height2 = height - 1;
-    // int width2 = width - 1;
-
-    // float valor = (1 - valorJ) * (1 - valorI) * (ponto[0] + peso[i % height][j % width]);
-    // valor += valorJ * (1 - valorI) * (ponto[1] + peso[i % height][width2 - j % width]);
-    // valor += (1 - valorJ) * valorI * (ponto[2] + peso[height2 - i % height][j % width]);
-    // valor += valorJ * valorI * (ponto[3] + peso[height2 - i % height][width2 - j % width]);
-
-    int posTileI = i1 % height, posTileJ = j1 % width;
-
-    // valorI = (float) 1 / distanciaPontos(posTileI, posTileJ, height, posTileJ);
-    // valorJ = (float) 1 / distanciaPontos(posTileI, posTileJ, posTileI, width);
-
-    float valor = (1 - valorJ) * (1 - valorI) * ponto[0];
-    valor += valorJ * (1 - valorI) * ponto[1];
-    valor += (1 - valorJ) * valorI * ponto[2];
-    valor += valorJ * valorI * ponto[3];
-
-    // float valor = (1 - valorJ) * (1 - valorI) * ponto[0];
-    // valor += valorJ * (1 - valorI) * ponto[1];
-    // valor += (1 - valorJ) * valorI * ponto[2];
-    // valor += valorJ * valorI * ponto[3];
-
-    return valor;
-}
-
-float interpolacaoBilinear2(float x, float y, int ponto[][2])
-{
-    // float valor = (1 - y) * ((1 - x) * ponto[0][0] + x * ponto[0][1]);
-    // valor += y * ((1 - x) * ponto[1][0] + x * ponto[1][1]);
-
-    // float valor = (1 - y) * ((1 - x) * ponto[1][1] + x * ponto[1][0]);
-    // valor += y * ((1 - x) * ponto[0][1] + x * ponto[0][0]);
-    // return valor;
-
-    // float valor1, valor2, valor3, valor4;
-    // valor1 = y * x * ponto[0][0];
-    // valor2 = y * (1 - x) * ponto[0][1];
-    // valor3 = (1 - y) * x * ponto[1][0];
-    // valor4 = (1 - y) * (1 - x) * ponto[1][1];
-    // return valor1 + valor2 + valor3 + valor4;
-
-    return y * x * ponto[0][0]
-    + y * (1 - x) * ponto[0][1]
-    + (1 - y) * x * ponto[1][0]
-    + (1 - y) * (1 - x) * ponto[1][1];
-}
-
-void suavizaGray(ImageGray *image, int width, int height)
-{
-    float peso[height][width];
-    int menor = height;
-
-    if(width < height)
-        menor = width;
-
-    int posI = height-1;
-    int posJ = width-1;
-    
-    // Cria uma matriz com os "pesos" de cada posição (referente as bordas)
-    for(int i = menor; i > 0; i--, posI--, posJ--)
-    {
-        for(int k = 0; k <= posJ; k++)
-            peso[posI][k] = (float) i / menor;
-
-        for(int k = 0; k <= posI; k++)
-            peso[k][posJ] = (float) i / menor;
-    }
-
-    int ponto[4];
-    for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
-    {
-        if(i2 >= image->dim.altura)
-            i2 = i;
-
-        for(int j = 0, j2 = width; j < image->dim.largura; j++, j2++)
-        {
-            if(j2 >= image->dim.largura)
-                j2 = j;
-
-            ponto[0] = image->pixels[posicaoVetor(image->dim.largura, i, j)].value;
-            ponto[1] = image->pixels[posicaoVetor(image->dim.largura, i, j2)].value;
-            ponto[2] = image->pixels[posicaoVetor(image->dim.largura, i2, j)].value;
-            ponto[3] = image->pixels[posicaoVetor(image->dim.largura, i2, j2)].value;
-            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear(i, j, i2, j2, ponto, width, height, peso);
-        }
-    }
-}
-
-void suavizaGray2(ImageGray *image, int ***histogramas, int width, int height)
+void suavizaGray(ImageGray *image, int ***histogramas, int width, int height)
 {
     int ponto[2][2];
     float x, y;
@@ -660,45 +529,16 @@ void suavizaGray2(ImageGray *image, int ***histogramas, int width, int height)
             y = ((float) (i % height) / height);
             x = ((float) (j % width) / width);
 
-            // caixaI = i / (height+1) + 1;
-            // caixaJ = j / (width+1) + 1;
-
-
-            // y = (float) i / (caixaI * height);
-            // x = (float) j / (caixaJ * width);
-
-            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear2(x, y, ponto);
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].value = interpolacaoBilinear(x, y, ponto);
         }
     }
 }
 
-void suavizaColunaGray(ImageGray *image, int width)
-{
-    float media, pixel1, pixel2;
-    int aux1, aux2;
-    int quant = image->dim.largura / width;
-    
-    // Se o tamanho das caixas for exato, a quantidade de bordas pode decrementar 1
-    if(image->dim.largura % width == 0)
-        quant--;
+// TODO RGB futuro
+// void suavizaRGB(ImageRGB *image, int ***histogramasRed, int ***histogramasGreen, int ***histogramasBlue, int width, int height)
+// {
 
-    aux1 = width - 1;
-    aux2 = width;
-
-    for(int i = 0; i < quant; i++)
-    {
-        for(int j = 0; j < image->dim.altura; j++)
-        {
-            pixel1 = image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value;
-            pixel2 = image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value;
-            media = (pixel1 + pixel2) / 2;
-            image->pixels[posicaoVetor(image->dim.largura, j, aux1)].value = media;
-            image->pixels[posicaoVetor(image->dim.largura, j, aux2)].value = media;
-        }
-        aux1 += width;
-        aux2 += width;
-    }
-}
+// }
 
 ////////////// Funções de criação e liberação //////////////
 
@@ -919,14 +759,16 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
 {
     int caixaX, caixaY;
 
-    caixaX = calculaCaixa(image->dim.largura, tile_width);
-    caixaY = calculaCaixa(image->dim.altura, tile_height);
+    caixaX = calculaCaixas(image->dim.largura, tile_width);
+    caixaY = calculaCaixas(image->dim.altura, tile_height);
 
-    ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
+    // ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
+    ImageGray *resultado = copiarImagemGray(image);
     int tamVet = tile_height * tile_width;
     int *vetor = alocarInt(tamVet);
     int ***histogramas = alocarMatrizInt3(caixaY, caixaX, 256);
     int *histograma = alocarInt(256);
+    float clip_limit = (float) tamVet / 256 * 2;
     for(int a = 0; a < caixaY; a++)
     {
         for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
@@ -942,17 +784,9 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
             for(int i = 0; i < tam; i++)
                 histograma[vetor[i]]++;
 
-            redistribuirHistograma(histograma);
+            redistribuirHistograma(histograma, clip_limit);
+            normaliza_histograma(histograma, histogramas[a][b]);
 
-            // Remapeia todo o bloco
-            if(normaliza_histograma(histograma, histogramas[a][b]))
-            {
-                for(int i = 0, tam = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
-                {
-                    for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
-                        resultado->pixels[posicaoVetor(image->dim.largura, posI, posJ)].value = histogramas[a][b][vetor[tam]];
-                }
-            }
             limparVet(vetor, tam);
             limparVet(histograma, 256);
         }
@@ -960,10 +794,7 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
     histograma = liberarVetor(histograma);
     vetor = liberarVetor(vetor);
 
-    // suavizaColunaGray(resultado, tile_width);
-    // suavizaLinhaGray(resultado, tile_height);
-    // suavizaGray(resultado, tile_width, tile_height);
-    suavizaGray2(resultado, histogramas, tile_width, tile_height);
+    suavizaGray(resultado, histogramas, tile_width, tile_height);
     histogramas = liberarMatrizInt3(histogramas, caixaY, caixaX);
 
     return resultado;
@@ -1007,7 +838,7 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
             blur->pixels[meio].value = mediana(vetor, quant);
         }
     }
-
+    vetor = liberarVetor(vetor);
     return blur;
 }
 
