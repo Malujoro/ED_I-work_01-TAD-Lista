@@ -4,7 +4,7 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
-#include <python3.10/Python.h> // API para utilizar o python em C
+#include <Python.h> // API para utilizar o python em C
 #include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
 #include <string.h> //Biblioteca para usar strdup //possívelmente temporária
 
@@ -836,8 +836,8 @@ ImageGray *transpose_gray(const ImageGray *image)
         case 1:
             //Transpose - inverte diagonais direita superior e esqueda inferior
             for(int i = 0; i < image->dim.altura; i++){
-            for(int j = 0; j < image->dim.largura; j++)
-                imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
             }
             break;
         case 2:
@@ -853,22 +853,25 @@ ImageGray *transpose_gray(const ImageGray *image)
 }
 
 
-// // Operações para ImageRGB
+// TODO RGB futuro
 // ImageRGB *flip_vertical_rgb(const ImageRGB *image)
 // {
 
 // }
 
+// TODO RGB futuro
 // ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
 // {
 
 // }
 
+// TODO RGB futuro
 // ImageRGB *rotate_90_rgb(const ImageRGB *image)
 // {
 
 // }
 
+// TODO RGB futuro
 // ImageRGB *transpose_rgb(const ImageRGB *image)
 // {
 
@@ -975,7 +978,7 @@ ImageGray *negativo_gray(const ImageGray *image)
     return result;
 }
 
-// // Manipulação por pixel para ImageRGB
+// TODO RGB futuro
 // ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
 // {
 
@@ -989,6 +992,8 @@ ImageGray *negativo_gray(const ImageGray *image)
 ////////////////////////////////////////////////////////////
 
 //////////////////   Funções para as operações do Histórico   //////////////////// 
+
+// TODO RGB futuro [Todo o histórico]
 Historico_Gray *criar_lista(){
     return NULL;
 }
