@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
-#include <python3.10/Python.h> // API para utilizar o python em C
+#include <Python.h> // API para utilizar o python em C
 
 typedef struct dimensoes {
     int altura, largura;
@@ -74,7 +74,7 @@ int mediana(int *vetor, int tam);
 
 int cdf(int *vetor, int pos);
 int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max);
-void redistribuirHistograma(int *histograma);
+void redistribuirHistograma(int *histograma, int clip_limit);
 int posMinimo(int *histograma);
 int posMenor(int *histograma);
 void suavizaLinhaGray(ImageGray *image, int height);
