@@ -5,22 +5,24 @@
 
 int main()
 {
-    char *caminhoOriginal = "imagens";
-    char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
-    char *imagemOriginal = "utils/lena.png";
+    Geral();
+    // char *caminhoOriginal = "imagens";
+    // char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
+    // char *imagemOriginal = "utils/lena.png";
 
-    char *pasta = pastaPrincipal(caminhoOriginal);
-    char *caminho = gerarCaminho(pasta, "/", "lenaTeste");
-    char *txt = gerarCaminho(caminho, ".", "txt");
-    char *png = gerarCaminho(caminho, ".", "png");
+    // char *pasta = pastaPrincipal(caminhoOriginal);
+    // char *caminho = gerarCaminho(pasta, "/", "lenaTranspose");
+    // char *txt = gerarCaminho(caminho, ".", "txt");
+    // char *png = gerarCaminho(caminho, ".", "png");
 
-    
     // ImageGray *imagem = lerImagemGray(imagemOriginal, txtOriginal);
-    ImageGray *imagem = lerTxtGray(txtOriginal);
+    //ImageGray *imagem = lerTxtGray(txtOriginal);
     // imagem = median_blur_gray(imagem, 7);
-    imagem = clahe_gray(imagem, 64, 64);
-    // imagem = negativo(imagem);
-    salvarImagemGray(imagem, pasta, txt, png);
+  
+    // imagem = clahe_gray(imagem, 64, 128);
+    //imagem = negativo_gray(imagem);
+    // imagem = flip_vertical_gray(imagem);
+    // salvarImagemGray(imagem, pasta, txt, png);
 
     return 0;
 }

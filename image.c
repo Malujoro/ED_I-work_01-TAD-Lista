@@ -4,7 +4,9 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
-#include <python3.12/Python.h> // API para utilizar o python em C
+#include <python3.10/Python.h> // API para utilizar o python em C
+#include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
+#include <string.h> //Biblioteca para usar strdup //possívelmente temporária
 
 #define SCRIPT 0
 #define FUNCAO 1
@@ -12,6 +14,15 @@
 
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
+
+//struct dos nós da lista duplamente encadeada, usada no histórico
+typedef struct historico_gray
+{
+    ImageGray *img;
+    char *nome;
+    struct historico_gray *prox;
+    struct historico_gray *ant;
+} Historico_Gray;
 
 //////////////////// Funções auxiliares ////////////////////
 
@@ -719,20 +730,127 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 ////////////////// Funções para Operações //////////////////
 
 // // Operações para ImageGray
-// ImageGray *flip_vertical_gray(ImageGray *image)
-// {
 
-// }
+ImageGray *flip_vertical_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipV = create_image_gray(image->dim.largura, image->dim.altura);
 
-// ImageGray *flip_horizontal_gray(ImageGray *image)
-// {
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipV->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[posicaoVetor(image->dim.largura, (image->dim.altura - i - 1), j)];
+        }
+    }
 
-// }
+    return imageFlipV;
+}
 
-// ImageGray *transpose_gray(const ImageGray *image)
-// {
+ImageGray *flip_horizontal_gray(const ImageGray *image)
+{
+    ImageGray *imageFlipH = create_image_gray(image->dim.largura, image->dim.altura);
 
-// }
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipH->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
+        }
+    }
+
+    return imageFlipH;
+}
+
+
+int menuRotate(){
+    int op;
+    setlocale(LC_ALL,"");
+
+    printf("Menu de opções de Rotate:\n");
+    do{
+        printf("1- Rotacionar no sentido horário 🔁\n");  //\U0001F504
+        printf("2- Rotacionar no sentido anti-horário 🔄\n");  //\U0001F504
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while(getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while(1);
+
+    return op;  
+}
+
+ImageGray *rotate_90_gray(const ImageGray *image)
+{
+    ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
+
+    int op = menuRotate();
+
+    switch(op){
+        case 1:
+            //Rotacionar no sentido horário:
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+        case 2:
+            //Rotacionar no sentido anti horário
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+    }
+
+    return imageRotate;
+}
+
+
+int menuTranspose(){
+    setlocale(LC_ALL,"");
+
+    int op;
+
+    printf("Menu de opções de transpose:\n");
+    do{
+        printf("1- Transpose ↗️\n");  //\u2197
+        printf("2- Transpose ↘️\n");  //\u2198
+        printf("Escolha: ");
+        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
+            while (getchar() != '\n');
+            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
+        }
+        else
+            break;
+    } while (1);
+
+    return op;
+}
+
+ImageGray *transpose_gray(const ImageGray *image)
+{
+    ImageGray *imageTranspose = create_image_gray(image->dim.altura, image->dim.largura);
+
+    int op = menuTranspose();
+
+    switch (op){
+        case 1:
+            //Transpose - inverte diagonais direita superior e esqueda inferior
+            for(int i = 0; i < image->dim.altura; i++){
+            for(int j = 0; j < image->dim.largura; j++)
+                imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+        case 2:
+            //Transpose - inverte diagonais esquerda superior e direita inferior
+            for(int i = 0; i < image->dim.altura; i++){
+                for(int j = 0; j < image->dim.largura; j++)
+                    imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+            }
+            break;
+    }
+    
+    return imageTranspose;
+}
 
 
 // // Operações para ImageRGB
@@ -742,6 +860,11 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 // }
 
 // ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
+// {
+
+// }
+
+// ImageRGB *rotate_90_rgb(const ImageRGB *image)
 // {
 
 // }
@@ -864,3 +987,329 @@ ImageGray *negativo_gray(const ImageGray *image)
 // }
 
 ////////////////////////////////////////////////////////////
+
+//////////////////   Funções para as operações do Histórico   //////////////////// 
+Historico_Gray *criar_lista(){
+    return NULL;
+}
+
+//cria um novo elemento para o historico
+Historico_Gray *criar_No(){
+    Historico_Gray *no = (Historico_Gray *) malloc(sizeof(Historico_Gray));
+    if(!no){
+        printf("Erro ao alocar o novo nó.");
+        exit(EXIT_FAILURE);
+    }
+
+    no->prox = NULL;
+    no->ant = NULL;
+
+    return no;
+}
+
+//adiciona a ultima edição ao final do historico
+Historico_Gray *add_historico(ImageGray *image, Historico_Gray *l, const char *nome){
+    Historico_Gray *novo = criar_No();
+    novo->img = image;
+    novo->nome = strdup(nome);  //cria uma cópia de nome
+
+    if(l == NULL)
+        return novo;
+    
+    Historico_Gray *aux = l;
+    while(aux->prox != NULL)
+        aux = aux->prox;
+
+    aux->prox = novo;
+    novo->ant = aux;
+
+    return novo;
+}
+
+//percorre para a proxima edição
+Historico_Gray *next_Image(Historico_Gray *atual){
+    if(atual != NULL && atual->prox != NULL){
+        atual = atual->prox;
+        printf("Imagem atual:\n");
+        printf("\"%s\"\n\n", atual->nome);
+    }
+    else{
+        printf("Você chegou a ultima imagem.\n");
+        printf("\"%s\"\n", atual->nome);
+    }
+    return atual;
+}
+
+//percorre para a edição anterior
+Historico_Gray *prev_Image(Historico_Gray *atual){
+    if(atual && atual->ant != NULL){
+        atual = atual->ant;
+        printf("Imagem atual:\n");
+        printf("\"%s\"\n\n", atual->nome);
+    }
+    else{
+        printf("Você chegou a ultima imagem.\n");
+        printf("\"%s\"\n", atual->nome);
+    }
+    return atual;
+}
+
+//libera a memória do historico de imagens
+void free_Historico(Historico_Gray *l){
+    Historico_Gray *aux = l;
+
+    while(l != NULL){
+        l = l->prox;
+        free_image_gray(aux->img);
+        aux->nome = liberarVetor(aux->nome);
+        free(aux);
+    }
+}
+///////////////////////////////////////////////////////////////
+
+////////////////////// SALVAR UMA IMAGEM //////////////////////
+
+void salvar(ImageGray *image, char *pasta, char *nome){
+    char *caminho = gerarCaminho(pasta, "/", nome);
+    char *txt = gerarCaminho(caminho, ".", "txt");
+    char *png = gerarCaminho(caminho, ".", "png");
+
+    salvarImagemGray(image, pasta, txt, png);
+    
+    system("clear");
+    printf("Imagem salva com sucesso...\nPressione qualquer tecla para continuar...\n");
+    while (getchar() != '\n');
+    getchar();
+    system("clear");
+
+    caminho = liberarVetor(caminho);
+    txt = liberarVetor(txt);
+    png = liberarVetor(png);
+}
+
+///////////////////////////////////////////////////////////////
+
+//////////////////////////    MENUS    ////////////////////////
+
+int menuEdicoes(){
+    int op;
+
+    do{
+        printf("=----- Edições -----=\n");
+        printf("1- Flip Vertical\n");
+        printf("2- Flip Horizontal\n");
+        printf("3- Rotacionar 90 graus\n");
+        printf("4- Transpose\n");
+        printf("5- Clahe\n");
+        printf("6- Blur\n");
+        printf("7- Negativo\n");
+        printf("0- Sair\n");
+        printf("Escolha: ");
+            if(scanf("%d", &op) != 1 || (op < 0 || op > 7)){
+                while (getchar() != '\n');
+                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
+            }
+            else
+                break;
+    } while (1);
+
+    return op;
+}
+
+Historico_Gray *edicoes(Historico_Gray *l){
+    int op;
+    ImageGray *editedImage = NULL;
+    char *nome = NULL;
+    char *sufixo = NULL;
+    Historico_Gray *aux = l;
+
+    do{
+        op = menuEdicoes();
+        system("clear");
+
+        switch(op){
+            case 1:
+                editedImage = flip_vertical_gray(aux->img);
+                nome = strdup("flipV");
+                break;
+
+            case 2:
+                editedImage = flip_horizontal_gray(aux->img);
+                nome = strdup("flipH");
+                break;
+
+            case 3:
+                editedImage = rotate_90_gray(aux->img);
+                nome = strdup("rot90");
+                break;
+
+            case 4: 
+                editedImage = transpose_gray(aux->img);
+                nome = strdup("transp");
+                break;
+
+            case 5:
+                editedImage = clahe_gray(aux->img, 64, 128);
+                nome = strdup("clahe");
+                break;
+
+            case 6: 
+                editedImage = median_blur_gray(aux->img, 7);
+                nome = strdup("blur");
+                break;
+
+            case 7: 
+                editedImage = negativo_gray(aux->img);
+                nome = strdup("negativ");
+                break;
+
+            case 0:
+                printf("Saindo das edições...\nPressione qualquer tecla para continuar...\n");
+                while (getchar() != '\n');
+                getchar();
+                system("clear");
+                break;
+
+            default:
+                printf("Opção inválida!\n");
+                continue;
+        }
+        if(editedImage != NULL){
+            sufixo = nome;
+            nome = malloc(strlen(aux->nome) + strlen(nome) + 2);
+            if (nome == NULL) {
+                fprintf(stderr, "Erro! Não foi possível alocar memória para nome.\n");
+                exit(EXIT_FAILURE);
+            }
+            sprintf(nome, "%s_%s", aux->nome, sufixo);
+
+            aux = add_historico(editedImage, l, nome);
+            editedImage = NULL;
+
+            sufixo = liberarVetor(sufixo);
+            nome = liberarVetor(nome);
+            printf("Nova imagem: \"%s\"\n\n", aux->nome);
+        }
+
+    } while(op != 0);
+    return aux;
+}
+
+int menuHist(){
+    int op;
+
+    do{
+        printf("Historico\n");
+        printf("1- Proxima Imagem\n");
+        printf("2- Imagem anterior\n");
+        printf("0- Sair\n");
+        printf("Escolha: ");
+            if(scanf("%d", &op) != 1 || (op < 0 || op > 2)){
+                while (getchar() != '\n');
+                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
+            }
+            else
+                break;
+    } while (1);
+
+    return op;
+}
+
+Historico_Gray *historico(Historico_Gray *atual){
+    int op;
+
+    printf("Imagem atual: \"%s\"\n", atual->nome);
+
+    do{
+        op = menuHist();
+        system("clear");
+
+        switch (op) {
+            case 1:
+                atual = next_Image(atual);
+                break;
+
+            case 2:
+                atual = prev_Image(atual);
+                break;
+
+            case 0:
+                printf("Saindo do Histórico...\nPressione qualquer tecla para continuar...\n");
+                while (getchar() != '\n');
+                getchar();
+                system("clear");
+                break;
+        }
+    }while(op != 0);
+
+    return atual;
+}
+
+
+int menuGeral(){
+    int op;
+
+    do{
+        printf("=----- MENU -----=\n");
+        printf("1- Editar imagem\n");
+        printf("2- Ver historico de edições\n");
+        printf("3- Salvar imagem\n");
+        printf("0- Encerrar programa\n");
+        printf("Escolha: ");
+            if(scanf("%d", &op) != 1 || (op < 0 || op > 3)){
+                while (getchar() != '\n');
+                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
+            }
+            else
+                break;
+    } while (1);
+
+    return op;
+}
+
+void Geral(){
+    int op;
+
+    char *caminhoOriginal = "imagens";
+    char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
+    char *imagemOriginal = "utils/lena.png";
+    char *pasta = pastaPrincipal(caminhoOriginal);
+ 
+    ImageGray *image = lerImagemGray(imagemOriginal, txtOriginal);
+
+    char *nome = strdup("lena");
+
+    Historico_Gray *history = criar_lista();
+    history = add_historico(image, history, nome); //adiciona a imagem original na cabeça da lista
+
+    printf("Imagem: \"%s\" foi adicionada\n\n", history->nome);
+
+    nome = liberarVetor(nome);
+
+    do{
+        printf("Imagem atual: %s\n\n", history->nome);
+        op = menuGeral();
+        system("clear");
+
+        switch (op){
+            case 1:
+                history = edicoes(history);
+                break;
+
+            case 2:
+                history = historico(history);
+                break;
+
+            case 3: 
+                printf("Salvando imagem \"%s\"...\n\n", history->nome);
+                salvar(history->img, pasta, history->nome);
+                break;
+
+            case 0:
+                printf("Encerrando programa...\n");
+                txtOriginal = liberarVetor(txtOriginal);
+                pasta = liberarVetor(pasta);
+                break;
+        }
+    }while(op != 0);
+}
