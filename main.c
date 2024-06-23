@@ -22,6 +22,5 @@ int main()
     //imagem = negativo_gray(imagem);
     // imagem = flip_vertical_gray(imagem);
     // salvarImagemGray(imagem, pasta, txt, png);
-
     return 0;
 }
