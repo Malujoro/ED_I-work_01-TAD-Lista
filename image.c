@@ -996,9 +996,10 @@ Historico_Gray *prev_Image(Historico_Gray *atual){
 
 //libera a memória do historico de imagens
 void free_Historico(Historico_Gray *l){
-    Historico_Gray *aux = l;
+    Historico_Gray *aux;
 
     while(l != NULL){
+        aux = l;
         l = l->prox;
         free_image_gray(aux->img);
         aux->nome = liberarVetor(aux->nome);
@@ -1007,7 +1008,7 @@ void free_Historico(Historico_Gray *l){
 }
 ///////////////////////////////////////////////////////////////
 
-////////////////////// SALVAR UMA IMAGEM //////////////////////
+////////////////////// SALVAR IMAGEM //////////////////////
 
 void salvar(ImageGray *image, char *pasta, char *nome){
     char *caminho = gerarCaminho(pasta, "/", nome);
@@ -1026,6 +1027,26 @@ void salvar(ImageGray *image, char *pasta, char *nome){
     txt = liberarVetor(txt);
     png = liberarVetor(png);
 }
+
+void salvarTudo(Historico_Gray *l, char *pasta){
+    Historico_Gray *aux = l;
+
+    while(aux->ant->ant != NULL)
+        aux = aux->ant;
+
+    while(aux != NULL){
+        printf("Salvando imagem \"%s\"...\n\n", aux->nome);
+        salvar(aux->img, pasta, aux->nome);
+        aux = aux->prox;
+    }
+
+    system("clear");
+    printf("Todas as imagens foram salvas com sucesso...\nPressione qualquer tecla para continuar...\n");
+    while (getchar() != '\n');
+    getchar();
+    system("clear");
+}
+
 
 ///////////////////////////////////////////////////////////////
 
@@ -1116,11 +1137,7 @@ Historico_Gray *edicoes(Historico_Gray *l){
         }
         if(editedImage != NULL){
             sufixo = nome;
-            nome = malloc(strlen(aux->nome) + strlen(nome) + 2);
-            if (nome == NULL) {
-                fprintf(stderr, "Erro! Não foi possível alocar memória para nome.\n");
-                exit(EXIT_FAILURE);
-            }
+            nome = alocarStr(strlen(aux->nome) + strlen(nome) + 2);
             sprintf(nome, "%s_%s", aux->nome, sufixo);
 
             aux = add_historico(editedImage, l, nome);
@@ -1186,7 +1203,7 @@ Historico_Gray *historico(Historico_Gray *atual){
 }
 
 
-int menuGeral(){
+int menuGray(){
     int op;
 
     do{
@@ -1194,9 +1211,10 @@ int menuGeral(){
         printf("1- Editar imagem\n");
         printf("2- Ver historico de edições\n");
         printf("3- Salvar imagem\n");
+        printf("4- Salvar tudo\n");
         printf("0- Encerrar programa\n");
         printf("Escolha: ");
-            if(scanf("%d", &op) != 1 || (op < 0 || op > 3)){
+            if(scanf("%d", &op) != 1 || (op < 0 || op > 4)){
                 while (getchar() != '\n');
                 printf("Entrada inválida. Por favor, digite uma opção válida.\n");
             }
@@ -1207,8 +1225,9 @@ int menuGeral(){
     return op;
 }
 
-void Geral(){
+void Executar_Gray(){
     int op;
+    char ch;
 
     char *caminhoOriginal = "imagens";
     char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
@@ -1228,13 +1247,29 @@ void Geral(){
 
     do{
         printf("Imagem atual: %s\n\n", history->nome);
-        op = menuGeral();
+        op = menuGray();
         system("clear");
 
         switch (op){
             case 1:
-                history = edicoes(history);
-                break;
+                if(history->prox != NULL){
+                    printf("ATENÇÃO!\nA imagem atual não é a ultima imagem editada.\nSe você decidir editar a imagem atual, todas as edições posteriores realizadas anteriormente serão perdidas.\nAvançar? (S/N):");
+                    scanf(" %c", &ch);
+                    if(ch == 'S' || ch == 's'){
+                        system("clear");
+                        free_Historico(history->prox);
+                        history->prox = NULL;
+
+                        history = edicoes(history);
+                        break;
+                    }
+                    else
+                        break;
+                }
+                else{
+                    history = edicoes(history);
+                    break;
+                }
 
             case 2:
                 history = historico(history);
@@ -1243,6 +1278,10 @@ void Geral(){
             case 3: 
                 printf("Salvando imagem \"%s\"...\n\n", history->nome);
                 salvar(history->img, pasta, history->nome);
+                break;
+
+            case 4:
+                salvarTudo(history, pasta);
                 break;
 
             case 0:

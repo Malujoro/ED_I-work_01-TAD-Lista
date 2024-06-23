@@ -126,6 +126,6 @@ ImageRGB *negativo_rgb(const ImageRGB *image);
 
 ////////////////////////////////////////////////////////////
 
-void Geral();
+void Executar_Gray();
 
 #endif // IMAGE_H

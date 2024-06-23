@@ -5,7 +5,7 @@
 
 int main()
 {
-    Geral();
+    Executar_Gray();
     // char *caminhoOriginal = "imagens";
     // char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
     // char *imagemOriginal = "utils/lena.png";
