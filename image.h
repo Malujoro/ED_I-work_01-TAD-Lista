@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
-#include <python3.10/Python.h> // API para utilizar o python em C
+#include <Python.h> // API para utilizar o python em C
 
 typedef struct dimensoes {
     int altura, largura;
@@ -33,29 +33,38 @@ typedef struct imageRGB {
 
 // Função para converter uma posição de matriz em posição de vetor
 int posicaoVetor(int largura, int i, int j);
+void limparVet(int *vetor, int tam);
+char *intParaStr(int num);
 
 FILE *lerArquivo(char *caminho, char *modo);
 
 char *alocarStr(int tam);
 int *alocarInt(int tam);
-float *alocarFloat(int tam);
+PyObject **alocarPython(int tam);
 
 // Funções para alocar um vetor de pixels
 PixelRGB *alocarPixelRGB(int tam);
 PixelGray *alocarPixelGray(int tam);
 
 void *liberarVetor(void *vetor);
-void limparFloat(float *vetor, int tam);
 
-char *intParaStr(int num);
+//////////////// Pastas ////////////////
 
 char *gerarCaminho(char *pasta, char *simbolo, char *nome);
-
 DIR *abrirPasta(char *caminho);
 void criarPasta(char *caminho);
 int pastaExiste(char *caminho);
 int contarPastas(char *caminho);
 char *pastaPrincipal(char *caminho);
+
+//////////////// Python ////////////////
+
+PyObject **inicializaPython(char *funcao, char *image_path, char *output_path, int gray);
+void executaPython(PyObject **matriz);
+void finalizaPython(PyObject **matriz);
+
+void txt_from_image(char *image_path, char *output_path, int gray);
+void image_from_txt(char *txt_path, char *output_path, int gray);
 
 ///////// Auxiliar Median Blur /////////
 
@@ -63,11 +72,11 @@ int mediana(int *vetor, int tam);
 
 //////////// Auxiliar Clahe ////////////
 
-float cdf(float *vetor, int pos);
-float cdf_normalizado(float cdf_i, float cdf_min, float cdf_max);
-void redistribuirHistograma(float *histograma);
-int posMinimo(float *histograma);
-int posMaximo(float *histograma);
+int cdf(int *vetor, int pos);
+int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max);
+void redistribuirHistograma(int *histograma, int clip_limit);
+int posMinimo(int *histograma);
+int posMenor(int *histograma);
 void suavizaLinhaGray(ImageGray *image, int height);
 void suavizaColunaGray(ImageGray *image, int width);
 
