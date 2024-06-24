@@ -5,7 +5,7 @@
 
 int main()
 {
-    Geral();
+    Executar_Gray();
     // char *caminhoOriginal = "imagens";
     // char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
     // char *imagemOriginal = "utils/lena.png";
@@ -23,6 +23,5 @@ int main()
     //imagem = negativo_gray(imagem);
     // imagem = flip_vertical_gray(imagem);
     // salvarImagemGray(imagem, pasta, txt, png);
-
     return 0;
 }
