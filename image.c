@@ -7,10 +7,43 @@
 #include <Python.h> // API para utilizar o python em C
 #include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
 #include <string.h> //Biblioteca para usar strdup //possívelmente temporária
+#include <gtk-4.0/gtk/gtk.h> // Biblioteca para interface gráfica
+#include <ctype.h> // Biblioteca para isdigit()
+#include <time.h> // Biblioteca para isdigit()
 
 #define SCRIPT 0
 #define FUNCAO 1
 #define ARGUMENTOS 2
+
+#define RGB 0
+#define GRAY 1
+#define TRANSPOSE1 2
+#define TRANSPOSE2 3
+#define ROTATE_90 4
+#define ROTATE_90_ANTI 5
+#define VERTICAL 6
+#define HORIZONTAL 7
+#define BLUR 8
+#define CLAHE 9
+#define NEGATIVO 10
+#define ALEATORIO 11
+#define ANTERIOR 12
+#define PROXIMO 13
+#define SALVAR 14
+#define SAIR 15
+
+int funcoes[] = {RGB, GRAY, TRANSPOSE1, TRANSPOSE2, ROTATE_90, ROTATE_90_ANTI, VERTICAL, HORIZONTAL, BLUR, CLAHE, NEGATIVO, ALEATORIO, ANTERIOR, PROXIMO, SALVAR, SAIR};
+
+int tileBlurGlobal = 9;
+int alturaClaheGlobal = 64;
+int larguraClaheGlobal = 64;
+int clipLimitGlobal = 40;
+int randomGlobal = 3;
+
+char *pastaOriginal;
+char *txtOriginal;
+
+GtkWidget *grid;
 
 // TODO Criar função de se comunicar com python
 // TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
@@ -20,9 +53,12 @@ typedef struct historico_gray
 {
     ImageGray *img;
     char *nome;
+    char *png;
     struct historico_gray *prox;
     struct historico_gray *ant;
 } Historico_Gray;
+
+Historico_Gray *history;
 
 //////////////////// Funções auxiliares ////////////////////
 
@@ -52,10 +88,41 @@ char *intParaStr(int num)
         num %= tam;
         tam /= 10;
     }
-
+    result[quant] = '\0';
     return result;
 }
 
+int validarNumero(const gchar *str)
+{
+    for(int i = 0; str[i] != '\0'; i++)
+    {
+        if (!isdigit(str[i]))
+            return 0;
+    }
+    return 1;
+}
+
+char *nomeCaminho(char *imagem)
+{
+    int posPonto = strlen(imagem), posBarra = -1;
+
+    for(int i = 0; imagem[i] != '\0'; i++)
+    {
+        if(imagem[i] == '.')
+            posPonto = i;
+        else if(imagem[i] == '/')
+            posBarra = i;
+    }
+
+    int tam = posPonto - posBarra;
+    char *nome = alocarStr(tam);
+
+    for(int i = posBarra+1, j = 0; i < posPonto && j < tam; i++, j++)
+        nome[j] = imagem[i];
+    nome[tam-1] = '\0';
+
+    return nome;
+}
 /////////////// Alocação ///////////////
 
 FILE *lerArquivo(char *caminho, char *modo)
@@ -201,7 +268,7 @@ void *liberarMatrizInt3(int ***matriz, int lin, int col)
 
 char *gerarCaminho(char *pasta, char *simbolo, char *nome)
 {
-    int tamanho = 128;
+    int tamanho = 256;
     char *caminho = alocarStr(tamanho);
 
     snprintf(caminho, tamanho, "%s%s%s", pasta, simbolo, nome);
@@ -262,6 +329,9 @@ int contarPastas(char *caminho)
 
 char *pastaPrincipal(char *caminho)
 {
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
+
     char *num = intParaStr(contarPastas(caminho));
     char *caminho2 = gerarCaminho(caminho, "/", num);
 
@@ -782,23 +852,22 @@ ImageGray *rotate_90_gray(const ImageGray *image)
 {
     ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
 
-    int op = menuRotate();
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
 
-    switch(op){
-        case 1:
-            //Rotacionar no sentido horário:
-            for(int i = 0; i < image->dim.altura; i++){
-                for(int j = 0; j < image->dim.largura; j++)
-                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
-            }
-            break;
-        case 2:
-            //Rotacionar no sentido anti horário
-            for(int i = 0; i < image->dim.altura; i++){
-                for(int j = 0; j < image->dim.largura; j++)
-                    imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
-            }
-            break;
+    return imageRotate;
+}
+
+ImageGray *rotate_90_anti_gray(const ImageGray *image)
+{
+    ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
+
+    //Rotacionar no sentido anti horário
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
     }
 
     return imageRotate;
@@ -830,23 +899,23 @@ ImageGray *transpose_gray(const ImageGray *image)
 {
     ImageGray *imageTranspose = create_image_gray(image->dim.altura, image->dim.largura);
 
-    int op = menuTranspose();
+    //Transpose - inverte diagonais direita superior e esqueda inferior
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
+    
+    return imageTranspose;
+}
 
-    switch (op){
-        case 1:
-            //Transpose - inverte diagonais direita superior e esqueda inferior
-            for(int i = 0; i < image->dim.altura; i++){
-                for(int j = 0; j < image->dim.largura; j++)
-                    imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
-            }
-            break;
-        case 2:
-            //Transpose - inverte diagonais esquerda superior e direita inferior
-            for(int i = 0; i < image->dim.altura; i++){
-                for(int j = 0; j < image->dim.largura; j++)
-                    imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
-            }
-            break;
+ImageGray *transpose2_gray(const ImageGray *image)
+{
+    ImageGray *imageTranspose = create_image_gray(image->dim.altura, image->dim.largura);
+
+    //Transpose - inverte diagonais esquerda superior e direita inferior
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
     }
     
     return imageTranspose;
@@ -894,7 +963,7 @@ ImageGray *clahe_gray(const ImageGray *image, int tile_width, int tile_height)
     int *vetor = alocarInt(tamVet);
     int ***histogramas = alocarMatrizInt3(caixaY, caixaX, 256);
     int *histograma = alocarInt(256);
-    float clip_limit = (float) tamVet / 256 * 2;
+    float clip_limit = clipLimitGlobal;
     for(int a = 0; a < caixaY; a++)
     {
         for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
@@ -991,6 +1060,23 @@ ImageGray *negativo_gray(const ImageGray *image)
 
 ////////////////////////////////////////////////////////////
 
+void exibirImagemGray(Historico_Gray *atual)
+{
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
+    
+    if (!pixbuf)
+    {
+        g_print("Erro ao carregar a imagem\n");
+        exit(EXIT_FAILURE);
+    }
+
+    GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
+    g_object_unref(pixbuf);
+
+    gtk_widget_set_size_request(resultado, atual->img->dim.largura, atual->img->dim.altura);
+    gtk_grid_attach(GTK_GRID(grid), resultado, 16, 0, 16, 16);
+}
+
 //////////////////   Funções para as operações do Histórico   //////////////////// 
 
 // TODO RGB futuro [Todo o histórico]
@@ -1006,6 +1092,7 @@ Historico_Gray *criar_No(){
         exit(EXIT_FAILURE);
     }
 
+    no->png = NULL;
     no->prox = NULL;
     no->ant = NULL;
 
@@ -1033,28 +1120,36 @@ Historico_Gray *add_historico(ImageGray *image, Historico_Gray *l, const char *n
 
 //percorre para a proxima edição
 Historico_Gray *next_Image(Historico_Gray *atual){
-    if(atual != NULL && atual->prox != NULL){
-        atual = atual->prox;
-        printf("Imagem atual:\n");
-        printf("\"%s\"\n\n", atual->nome);
-    }
-    else{
-        printf("Você chegou a ultima imagem.\n");
-        printf("\"%s\"\n", atual->nome);
+    if(atual != NULL)
+    {
+        if(atual->prox != NULL){
+            atual = atual->prox;
+            printf("Imagem atual:\n");
+            printf("\"%s\"\n\n", atual->nome);
+        }
+        else{
+            printf("Você chegou a ultima imagem.\n");
+            printf("\"%s\"\n", atual->nome);
+        }
+        exibirImagemGray(atual);
     }
     return atual;
 }
 
 //percorre para a edição anterior
 Historico_Gray *prev_Image(Historico_Gray *atual){
-    if(atual && atual->ant != NULL){
-        atual = atual->ant;
-        printf("Imagem atual:\n");
-        printf("\"%s\"\n\n", atual->nome);
-    }
-    else{
-        printf("Você chegou a ultima imagem.\n");
-        printf("\"%s\"\n", atual->nome);
+    if(atual != NULL)
+    {
+        if(atual->ant != NULL){
+            atual = atual->ant;
+            printf("Imagem atual:\n");
+            printf("\"%s\"\n\n", atual->nome);
+        }
+        else{
+            printf("Você chegou a primeira imagem.\n");
+            printf("\"%s\"\n", atual->nome);
+        }
+        exibirImagemGray(atual);
     }
     return atual;
 }
@@ -1068,6 +1163,7 @@ void free_Historico(Historico_Gray *l){
         l = l->prox;
         free_image_gray(aux->img);
         aux->nome = liberarVetor(aux->nome);
+        aux->png = liberarVetor(aux->png);
         free(aux);
     }
 }
@@ -1081,16 +1177,17 @@ void salvar(ImageGray *image, char *pasta, char *nome){
     char *png = gerarCaminho(caminho, ".", "png");
 
     salvarImagemGray(image, pasta, txt, png);
+    history->png = png;
+    exibirImagemGray(history);
     
-    system("clear");
-    printf("Imagem salva com sucesso...\nPressione qualquer tecla para continuar...\n");
-    while (getchar() != '\n');
-    getchar();
-    system("clear");
+    // system("clear");
+    g_print("Imagem salva com sucesso...\n");
+    // while (getchar() != '\n');
+    // getchar();
+    // system("clear");
 
     caminho = liberarVetor(caminho);
     txt = liberarVetor(txt);
-    png = liberarVetor(png);
 }
 
 void salvarTudo(Historico_Gray *l, char *pasta){
@@ -1100,16 +1197,12 @@ void salvarTudo(Historico_Gray *l, char *pasta){
         aux = aux->ant;
 
     while(aux != NULL){
-        printf("Salvando imagem \"%s\"...\n\n", aux->nome);
+        g_print("Salvando imagem \"%s\"...\n\n", aux->nome);
         salvar(aux->img, pasta, aux->nome);
         aux = aux->prox;
     }
 
-    system("clear");
-    printf("Todas as imagens foram salvas com sucesso...\nPressione qualquer tecla para continuar...\n");
-    while (getchar() != '\n');
-    getchar();
-    system("clear");
+    g_print("Todas as imagens foram salvas com sucesso...\n");
 }
 
 ///////////////////////////////////////////////////////////////
@@ -1141,78 +1234,74 @@ int menuEdicoes(){
     return op;
 }
 
-Historico_Gray *edicoes(Historico_Gray *l){
-    int op;
+Historico_Gray *edicoesGray(Historico_Gray *l, int op){
     ImageGray *editedImage = NULL;
     char *nome = NULL;
     char *sufixo = NULL;
     Historico_Gray *aux = l;
 
-    do{
-        op = menuEdicoes();
-        system("clear");
+    switch(op){
+        case VERTICAL:
+            editedImage = flip_vertical_gray(aux->img);
+            nome = strdup("flipV");
+            break;
 
-        switch(op){
-            case 1:
-                editedImage = flip_vertical_gray(aux->img);
-                nome = strdup("flipV");
-                break;
+        case HORIZONTAL:
+            editedImage = flip_horizontal_gray(aux->img);
+            nome = strdup("flipH");
+            break;
 
-            case 2:
-                editedImage = flip_horizontal_gray(aux->img);
-                nome = strdup("flipH");
-                break;
+        case ROTATE_90:
+            editedImage = rotate_90_gray(aux->img);
+            nome = strdup("rot90");
+            break;
+        
+        case ROTATE_90_ANTI:
+            editedImage = rotate_90_anti_gray(aux->img);
+            nome = strdup("rot90ant");
+            break;
 
-            case 3:
-                editedImage = rotate_90_gray(aux->img);
-                nome = strdup("rot90");
-                break;
+        case TRANSPOSE1:
+            editedImage = transpose_gray(aux->img);
+            nome = strdup("transp1");
+            break;
 
-            case 4: 
-                editedImage = transpose_gray(aux->img);
-                nome = strdup("transp");
-                break;
+        case TRANSPOSE2:
+            editedImage = transpose2_gray(aux->img);
+            nome = strdup("transp2");
+            break;
 
-            case 5:
-                editedImage = clahe_gray(aux->img, 64, 128);
-                nome = strdup("clahe");
-                break;
+        case CLAHE:
+            editedImage = clahe_gray(aux->img, larguraClaheGlobal, alturaClaheGlobal);
+            nome = strdup("clahe");
+            break;
 
-            case 6: 
-                editedImage = median_blur_gray(aux->img, 7);
-                nome = strdup("blur");
-                break;
+        case BLUR:
+            editedImage = median_blur_gray(aux->img, tileBlurGlobal);
+            nome = strdup("blur");
+            break;
 
-            case 7: 
-                editedImage = negativo_gray(aux->img);
-                nome = strdup("negativ");
-                break;
+        case NEGATIVO:
+            editedImage = negativo_gray(aux->img);
+            nome = strdup("negativ");
+            break;
 
-            case 0:
-                printf("Saindo das edições...\nPressione qualquer tecla para continuar...\n");
-                while (getchar() != '\n');
-                getchar();
-                system("clear");
-                break;
 
-            default:
-                printf("Opção inválida!\n");
-                continue;
-        }
-        if(editedImage != NULL){
-            sufixo = nome;
-            nome = alocarStr(strlen(aux->nome) + strlen(nome) + 2);
-            sprintf(nome, "%s_%s", aux->nome, sufixo);
+    }
 
-            aux = add_historico(editedImage, l, nome);
-            editedImage = NULL;
+    if(editedImage != NULL){
+        sufixo = nome;
+        nome = alocarStr(strlen(aux->nome) + strlen(nome) + 2);
+        sprintf(nome, "%s_%s", aux->nome, sufixo);
 
-            sufixo = liberarVetor(sufixo);
-            nome = liberarVetor(nome);
-            printf("Nova imagem: \"%s\"\n\n", aux->nome);
-        }
+        aux = add_historico(editedImage, l, nome);
+        editedImage = NULL;
 
-    } while(op != 0);
+        sufixo = liberarVetor(sufixo);
+        nome = liberarVetor(nome);
+        g_print("\nNova imagem: \"%s\"\n", aux->nome);
+    }
+
     return aux;
 }
 
@@ -1239,11 +1328,11 @@ int menuHist(){
 Historico_Gray *historico(Historico_Gray *atual){
     int op;
 
-    printf("Imagem atual: \"%s\"\n", atual->nome);
+    g_print("Imagem atual: \"%s\"\n", atual->nome);
 
     do{
         op = menuHist();
-        system("clear");
+        // system("clear");
 
         switch (op) {
             case 1:
@@ -1255,17 +1344,13 @@ Historico_Gray *historico(Historico_Gray *atual){
                 break;
 
             case 0:
-                printf("Saindo do Histórico...\nPressione qualquer tecla para continuar...\n");
-                while (getchar() != '\n');
-                getchar();
-                system("clear");
+                g_print("Saindo do Histórico...\n");
                 break;
         }
     }while(op != 0);
 
     return atual;
 }
-
 
 int menuGray(){
     int op;
@@ -1289,70 +1374,232 @@ int menuGray(){
     return op;
 }
 
-void Executar_Gray(){
-    int op;
-    char ch;
+void Executar_Gray(GtkWidget *widget, gpointer data)
+{
+    int op = *((int *) data);
 
-    char *caminhoOriginal = "imagens";
-    char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
-    char *imagemOriginal = "utils/lena.png";
-    char *pasta = pastaPrincipal(caminhoOriginal);
- 
-    ImageGray *image = lerImagemGray(imagemOriginal, txtOriginal);
+    if(history)
+    {
+        g_print("Imagem atual: %s\n\n", history->nome);
 
-    char *nome = strdup("lena");
 
-    Historico_Gray *history = criar_lista();
-    history = add_historico(image, history, nome); //adiciona a imagem original na cabeça da lista
+        if(op >= TRANSPOSE1 && op <= ALEATORIO)
+        {
+            int aux = 1, aux2 = op;
+            if(op == ALEATORIO)
+                aux = randomGlobal;
 
-    printf("Imagem: \"%s\" foi adicionada\n\n", history->nome);
+            for(int i = 0; i < aux; i++)
+            {
+                if(op == ALEATORIO)
+                    aux2 = rand() % 9 + 2;
 
-    nome = liberarVetor(nome);
-
-    do{
-        printf("Imagem atual: %s\n\n", history->nome);
-        op = menuGray();
-        system("clear");
-
-        switch (op){
-            case 1:
-                if(history->prox != NULL){
-                    printf("ATENÇÃO!\nA imagem atual não é a ultima imagem editada.\nSe você decidir editar a imagem atual, todas as edições posteriores realizadas anteriormente serão perdidas.\nAvançar? (S/N):");
-                    scanf(" %c", &ch);
-                    if(ch == 'S' || ch == 's'){
-                        system("clear");
-                        free_Historico(history->prox);
-                        history->prox = NULL;
-
-                        history = edicoes(history);
-                        break;
-                    }
-                    else
-                        break;
-                }
-                else{
-                    history = edicoes(history);
-                    break;
+                if(history->prox != NULL)
+                {
+                    free_Historico(history->prox);
+                    history->prox = NULL;
                 }
 
-            case 2:
-                history = historico(history);
-                break;
-
-            case 3: 
-                printf("Salvando imagem \"%s\"...\n\n", history->nome);
-                salvar(history->img, pasta, history->nome);
-                break;
-
-            case 4:
-                salvarTudo(history, pasta);
-                break;
-
-            case 0:
-                printf("Encerrando programa...\n");
-                txtOriginal = liberarVetor(txtOriginal);
-                pasta = liberarVetor(pasta);
-                break;
+                history = edicoesGray(history, aux2);
+                if(history != NULL)
+                    salvar(history->img, pastaOriginal, history->nome);
+            }
         }
-    }while(op != 0);
+
+        else
+        {
+            switch(op)
+            {
+                case ANTERIOR:
+                    history = prev_Image(history);
+                    break;
+
+                case PROXIMO:
+                    history = next_Image(history);
+                    break;
+
+                case SALVAR:
+                    g_print("Salvando imagem \"%s\"...\n\n", history->nome);
+                    salvar(history->img, pastaOriginal, history->nome);
+                    break;
+
+                case SAIR:
+                    g_print("Encerrando programa...\n");
+                    txtOriginal = liberarVetor(txtOriginal);
+                    pastaOriginal = liberarVetor(pastaOriginal);
+                    break;
+            }
+        }
+    }
+}
+
+///////////// Interface Gráfica /////////////
+
+void criarBotaoGray(char *nome, int x, int y, int largura, int altura, int posFuncao)
+{
+    GtkWidget *button = gtk_button_new_with_label(nome);
+    g_signal_connect(button, "clicked", G_CALLBACK(Executar_Gray), &funcoes[posFuncao]);
+    gtk_grid_attach(GTK_GRID(grid), button, x, y, largura, altura);
+}
+
+void numeroDigitadoGray(GtkEditable *entrada, gpointer user_data)
+{
+    const gchar *texto = gtk_editable_get_text(entrada);
+    int *pont = (int *) user_data;
+
+    // Verifica se o texto é um número válido
+    if (validarNumero(texto))
+        *pont = atoi(texto);
+}
+
+void imparDigitadoGray(GtkEditable *entrada, gpointer user_data)
+{
+    const gchar *texto = gtk_editable_get_text(entrada);
+    int *pont = (int *) user_data;
+
+    // Verifica se o texto é um número válido
+    if (validarNumero(texto))
+    {
+        if(atoi(texto) % 2 == 1)
+            *pont = atoi(texto);
+    }
+}
+
+void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
+{
+    GError *error = NULL;
+    GFile *file = gtk_file_dialog_open_finish(dialog, res, &error);
+
+    if(error != NULL)
+    {
+        g_print("Erro ao selecionar a imagem: %s\n", error->message);
+        g_error_free(error);
+    }
+    else if(file != NULL)
+    {
+        char *imagemOriginal = g_file_get_path(file);
+        g_print("Imagem selecionada: %s\n", imagemOriginal);
+        g_object_unref(file);
+
+        char *nome = nomeCaminho(imagemOriginal);
+        
+        char *caminhoOriginal = "imagens";
+        pastaOriginal = pastaPrincipal(caminhoOriginal);
+        char *caminho1 = gerarCaminho(pastaOriginal, "/", nome);
+        txtOriginal = gerarCaminho(caminho1, ".", "txt");
+    
+        ImageGray *image = lerImagemGray(imagemOriginal, txtOriginal);
+
+        history = criar_lista();
+        history = add_historico(image, history, nome); //adiciona a imagem original na cabeça da lista
+        salvar(image, pastaOriginal, nome);
+        
+        g_print("Imagem: \"%s\" foi adicionada\n\n", history->nome);
+
+        nome = liberarVetor(nome);
+
+        criarBotaoGray("Transpose 1", 0, TRANSPOSE1, 1, 1, TRANSPOSE1);
+        criarBotaoGray("Transpose 2", 0, TRANSPOSE2, 1, 1, TRANSPOSE2);
+        criarBotaoGray("Rotate 90", 0, ROTATE_90, 1, 1, ROTATE_90);
+        criarBotaoGray("Rotate 90 Anti", 0, ROTATE_90_ANTI, 1, 1, ROTATE_90_ANTI);
+        criarBotaoGray("Flip Vertical", 0, VERTICAL, 1, 1, VERTICAL);
+        criarBotaoGray("Flip Horizontal", 0, HORIZONTAL, 1, 1, HORIZONTAL);
+        criarBotaoGray("Median Blur", 0, BLUR, 1, 1, BLUR);
+        criarBotaoGray("CLAHE", 0, CLAHE, 1, 1, CLAHE);
+        criarBotaoGray("Negativo", 0, NEGATIVO+1, 1, 1, NEGATIVO);
+        criarBotaoGray("Aleatorio", 0, ALEATORIO+1, 1, 1, ALEATORIO);
+        criarBotaoGray("Imagem Anterior", 0, ANTERIOR+1, 1, 1, ANTERIOR);
+        criarBotaoGray("Imagem Seguinte", 1, ANTERIOR+1, 1, 1, PROXIMO);
+        criarBotaoGray("Salvar", 0, SALVAR, 1, 1, SALVAR);
+
+        GtkWidget *entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Tamanho: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(imparDigitadoGray), &tileBlurGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, BLUR, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Clip Limit: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &clipLimitGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Largura: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &larguraClaheGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 0, CLAHE+1, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Altura: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &alturaClaheGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE+1, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Quantidade: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &randomGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, ALEATORIO+1, 1, 1);
+
+        exibirImagemGray(history);
+    }
+    else
+        g_print("Você cancelou\n");
+}
+
+void selecionaGray(GtkWidget *widget, gpointer window)
+{
+    // Cria uma nova caixa de diálogo de seleção de arquivos usando GtkFileDialog
+    GtkFileDialog *dialog = gtk_file_dialog_new();
+
+    // Configura as opções de diálogo (abrir arquivos)
+    gtk_file_dialog_open(dialog,
+                         GTK_WINDOW(window),
+                         NULL,
+                         (GAsyncReadyCallback) janelaGray,
+                         window);
+}
+
+static void activate(GtkApplication *app, gpointer user_data)
+{
+    GtkWidget *window;
+    GtkWidget *button;
+
+    window = gtk_application_window_new(app);
+
+    gtk_window_set_title(GTK_WINDOW(window), "Edição de imagens");
+    // gtk_window_set_default_size(GTK_WINDOW(window), 780, 1280);
+    
+    // Cria uma grid
+    grid = gtk_grid_new();
+    // "Linka" a grid com a janela
+    gtk_window_set_child(GTK_WINDOW(window), grid);
+
+    // button = gtk_button_new_with_label("Abrir RGB");
+    // g_signal_connect(button, "clicked", G_CALLBACK(selecionaImagem), window);
+    // gtk_grid_attach(GTK_GRID(grid), button, 0, RGB, 1, 1);
+
+    button = gtk_button_new_with_label("Abrir Gray");
+    g_signal_connect(button, "clicked", G_CALLBACK(selecionaGray), NULL);
+    gtk_grid_attach(GTK_GRID(grid), button, 0, GRAY, 1, 1);
+
+    button = gtk_button_new_with_label("Sair");
+    g_signal_connect(button, "clicked", G_CALLBACK(Executar_Gray), &funcoes[SAIR]);
+    g_signal_connect_swapped(button, "clicked", G_CALLBACK(gtk_window_destroy), window);
+    gtk_grid_attach(GTK_GRID(grid), button, 0, SAIR, 1, 1);
+
+    gtk_window_present(GTK_WINDOW(window));
+}
+
+int iniciar(int argc, char **argv)
+{
+    GtkApplication *app;
+    int status;
+    srand(time(NULL));
+
+    app = gtk_application_new("org.gtk.example", G_APPLICATION_DEFAULT_FLAGS);
+
+    g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+
+    status = g_application_run(G_APPLICATION(app), argc, argv);
+
+    g_object_unref(app);
+    
+    return status;
 }

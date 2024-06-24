@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "image.h"
-#include "image.c"
 
-int main()
+int main(int argc, char **argv)
 {
-    Executar_Gray();
+    iniciar(argc, argv);
+    // Executar_Gray();
     // char *caminhoOriginal = "imagens";
     // char *txtOriginal = gerarCaminho(caminhoOriginal, "/", "lena.txt");
     // char *imagemOriginal = "utils/lena.png";

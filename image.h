@@ -6,6 +6,8 @@
 #include <dirent.h> // Biblioteca para verificar pastas
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <Python.h> // API para utilizar o python em C
+#include <gtk-4.0/gtk/gtk.h> // Biblioteca para interface gráfica
+
 
 typedef struct dimensoes {
     int altura, largura;
@@ -135,7 +137,8 @@ ImageRGB *negativo_rgb(const ImageRGB *image);
 
 ////////////////////////////////////////////////////////////
 
-void Executar_Gray();
+void Executar_Gray(GtkWidget *widget, gpointer data);
 
+int iniciar(int argc, char **argv);
 
 #endif // IMAGE_H
