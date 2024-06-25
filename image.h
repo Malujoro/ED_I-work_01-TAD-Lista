@@ -102,10 +102,10 @@ ImageGray *lerImagemGray(char *png, char *txt);
 ImageRGB *lerImagemRGB(char *png, char *txt);
 
 void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt);
-void salvarTxtRGB(ImageRGB *imagem);
+void salvarTxtRGB(ImageRGB *imagem, char *caminho, char *txt);
 
 void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png);
-void salvarImagemRGB(ImageRGB *imagem);
+void salvarImagemRGB(ImageRGB *imagem, char *caminho, char *txt, char *png);
 
 
 ////////////////// Funções para Operações //////////////////

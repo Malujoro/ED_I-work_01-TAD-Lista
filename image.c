@@ -5,11 +5,11 @@
 #include <sys/stat.h> // Biblioteca para criar pastas
 #include <sys/types.h> // Biblioteca para especificar os bits de permissão da pasta criada
 #include <Python.h> // API para utilizar o python em C
-#include <locale.h> //Biblioteca para adicionar os emoji (usados nas funções menuRotate e menuTranspose)
+#include <locale.h> //Biblioteca para adicionar os emoji (usados nos botões de rotate e transpose)
 #include <string.h> //Biblioteca para usar strdup //possívelmente temporária
 #include <gtk-4.0/gtk/gtk.h> // Biblioteca para interface gráfica
 #include <ctype.h> // Biblioteca para isdigit()
-#include <time.h> // Biblioteca para isdigit()
+#include <time.h> // Biblioteca para números aleatórios
 
 #define SCRIPT 0
 #define FUNCAO 1
@@ -45,9 +45,6 @@ char *txtOriginal;
 
 GtkWidget *grid;
 
-// TODO Criar função de se comunicar com python
-// TODO O caminho será o caminho relativo até a pasta. Nome será o nome do arquivo, junto da sua extensão
-
 //struct dos nós da lista duplamente encadeada, usada no histórico
 typedef struct historico_gray
 {
@@ -58,7 +55,17 @@ typedef struct historico_gray
     struct historico_gray *ant;
 } Historico_Gray;
 
-Historico_Gray *history;
+typedef struct historico_rgb
+{
+    ImageRGB *img;
+    char *nome;
+    char *png;
+    struct historico_rgb *prox;
+    struct historico_rgb *ant;
+} Historico_RGB;
+
+Historico_Gray *historyGray;
+Historico_RGB *historyRGB;
 
 //////////////////// Funções auxiliares ////////////////////
 
@@ -615,11 +622,54 @@ void suavizaGray(ImageGray *image, int ***histogramas, int width, int height)
     }
 }
 
-// TODO RGB futuro
-// void suavizaRGB(ImageRGB *image, int ***histogramasRed, int ***histogramasGreen, int ***histogramasBlue, int width, int height)
-// {
+void suavizaRGB(ImageRGB *image, int ***histogramasRed, int ***histogramasGreen, int ***histogramasBlue, int width, int height)
+{
+    int ponto[2][2];
+    float x, y;
+    int caixaI, caixaJ, caixaI2, caixaJ2, valor;
 
-// }
+    for(int i = 0, i2 = height; i < image->dim.altura; i++, i2++)
+    {
+        if(i2 >= image->dim.altura)
+            i2 = i;
+            
+        caixaI = i / height;
+        caixaI2 = i2 / height;
+
+        for(int j = 0, j2 = width; j < image->dim.largura; j++, j2++)
+        {
+            if(j2 >= image->dim.largura)
+                j2 = j;
+
+            caixaJ = j / width;
+            caixaJ2 = j2 / width;
+
+            y = ((float) (i % height) / height);
+            x = ((float) (j % width) / width);
+
+            valor = image->pixels[posicaoVetor(image->dim.largura, i, j)].red;
+            ponto[0][0] = histogramasRed[caixaI][caixaJ][valor];
+            ponto[0][1] = histogramasRed[caixaI][caixaJ2][valor];
+            ponto[1][0] = histogramasRed[caixaI2][caixaJ][valor];
+            ponto[1][1] = histogramasRed[caixaI2][caixaJ2][valor];
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].red = interpolacaoBilinear(x, y, ponto);
+
+            valor = image->pixels[posicaoVetor(image->dim.largura, i, j)].green;
+            ponto[0][0] = histogramasGreen[caixaI][caixaJ][valor];
+            ponto[0][1] = histogramasGreen[caixaI][caixaJ2][valor];
+            ponto[1][0] = histogramasGreen[caixaI2][caixaJ][valor];
+            ponto[1][1] = histogramasGreen[caixaI2][caixaJ2][valor];
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].green = interpolacaoBilinear(x, y, ponto);
+
+            valor = image->pixels[posicaoVetor(image->dim.largura, i, j)].blue;
+            ponto[0][0] = histogramasBlue[caixaI][caixaJ][valor];
+            ponto[0][1] = histogramasBlue[caixaI][caixaJ2][valor];
+            ponto[1][0] = histogramasBlue[caixaI2][caixaJ][valor];
+            ponto[1][1] = histogramasBlue[caixaI2][caixaJ2][valor];
+            image->pixels[posicaoVetor(image->dim.largura, i, j)].blue = interpolacaoBilinear(x, y, ponto);
+        }
+    }
+}
 
 ////////////// Funções de criação e liberação //////////////
 
@@ -727,25 +777,43 @@ ImageGray *lerTxtGray(char *caminho)
     return imagem;
 }
 
-// TODO RGB futuro
-// ImageRGB *lerTxtRGB(char *caminho)
-// {
+ImageRGB *lerTxtRGB(char *caminho)
+{
+    FILE *arquivo = lerArquivo(caminho, "r");
+    
+    int altura, largura;
+    fscanf(arquivo, "%d", &altura);
+    fgetc(arquivo);
+    fscanf(arquivo, "%d", &largura);
+    fgetc(arquivo);
 
-// }
+    ImageRGB *imagem = create_image_rgb(largura, altura);
+
+    for(int i = 0; i < altura; i++)
+    {
+        for(int j = 0; j < largura; j++)
+        {
+            fscanf(arquivo, "%d %d %d", &imagem->pixels[posicaoVetor(largura, i, j)].red, &imagem->pixels[posicaoVetor(largura, i, j)].green, &imagem->pixels[posicaoVetor(largura, i, j)].blue);
+            fgetc(arquivo);
+        }
+        fgetc(arquivo);
+    }
+    fclose(arquivo);
+    return imagem;
+}
 
 
-// TODO Falta completar [Python]
 ImageGray *lerImagemGray(char *png, char *txt)
 {
     txt_from_image(png, txt, 1);
     return lerTxtGray(txt);
 }
 
-// TODO RGB futuro
-// ImageRGB *lerImagemRGB(char *caminho)
-// {
-
-// }
+ImageRGB *lerImagemRGB(char *png, char *txt)
+{
+    txt_from_image(png, txt, 0);
+    return lerTxtRGB(txt);
+}
 
 
 void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt)
@@ -772,14 +840,31 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt)
     fclose(arquivo);
 }
 
-// TODO RGB futuro
-// void salvarTxtRGB(ImageRGB *imagem)
-// {
+void salvarTxtRGB(ImageRGB *imagem, char *caminho, char *txt)
+{       
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
 
-// }
+    FILE *arquivo = lerArquivo(txt, "w");
+
+    fprintf(arquivo, "%d", imagem->dim.altura);
+    fputc('\n', arquivo);
+    fprintf(arquivo, "%d", imagem->dim.largura);
+    fputc('\n', arquivo);
+
+    for(int i = 0; i < imagem->dim.altura; i++)
+    {
+        for(int j = 0; j < imagem->dim.largura; j++)
+        {
+            fprintf(arquivo, "%d %d %d,", imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)].red, imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)].green, imagem->pixels[posicaoVetor(imagem->dim.largura, i, j)].blue);
+        }
+        fputc('\n', arquivo);
+    }
+
+    fclose(arquivo);
+}
 
 
-// TODO Falta completar [Python]
 void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
 {
     if(!pastaExiste(caminho))
@@ -790,12 +875,15 @@ void salvarImagemGray(ImageGray *imagem, char *caminho, char *txt, char *png)
     image_from_txt(txt, png, 1);
 }
 
-// TODO RGB futuro
-// void salvarImagemRGB(ImageRGB *imagem)
-// {
+void salvarImagemRGB(ImageRGB *imagem, char *caminho, char *txt, char *png)
+{
+    if(!pastaExiste(caminho))
+        criarPasta(caminho);
 
-// }
+    salvarTxtRGB(imagem, caminho, txt);
 
+    image_from_txt(txt, png, 0);
+}
 
 ////////////////// Funções para Operações //////////////////
 
@@ -828,26 +916,6 @@ ImageGray *flip_horizontal_gray(const ImageGray *image)
 }
 
 
-int menuRotate(){
-    int op;
-    setlocale(LC_ALL,"");
-
-    printf("Menu de opções de Rotate:\n");
-    do{
-        printf("1- Rotacionar no sentido horário 🔁\n");  //\U0001F504
-        printf("2- Rotacionar no sentido anti-horário 🔄\n");  //\U0001F504
-        printf("Escolha: ");
-        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
-            while(getchar() != '\n');
-            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
-        }
-        else
-            break;
-    } while(1);
-
-    return op;  
-}
-
 ImageGray *rotate_90_gray(const ImageGray *image)
 {
     ImageGray *imageRotate = create_image_gray(image->dim.altura, image->dim.largura);
@@ -873,27 +941,6 @@ ImageGray *rotate_90_anti_gray(const ImageGray *image)
     return imageRotate;
 }
 
-
-int menuTranspose(){
-    setlocale(LC_ALL,"");
-
-    int op;
-
-    printf("Menu de opções de transpose:\n");
-    do{
-        printf("1- Transpose ↗️\n");  //\u2197
-        printf("2- Transpose ↘️\n");  //\u2198
-        printf("Escolha: ");
-        if(scanf("%d", &op) != 1 || (op != 1 && op != 2)){
-            while (getchar() != '\n');
-            printf("Entrada inválida. Por favor, escolha 1 ou 2.\n");
-        }
-        else
-            break;
-    } while (1);
-
-    return op;
-}
 
 ImageGray *transpose_gray(const ImageGray *image)
 {
@@ -922,30 +969,85 @@ ImageGray *transpose2_gray(const ImageGray *image)
 }
 
 
-// TODO RGB futuro
-// ImageRGB *flip_vertical_rgb(const ImageRGB *image)
-// {
 
-// }
+ImageRGB *flip_vertical_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageFlipV = create_image_rgb(image->dim.largura, image->dim.altura);
 
-// TODO RGB futuro
-// ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
-// {
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipV->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[posicaoVetor(image->dim.largura, (image->dim.altura - i - 1), j)];
+        }
+    }
 
-// }
+    return imageFlipV;
+}
 
-// TODO RGB futuro
-// ImageRGB *rotate_90_rgb(const ImageRGB *image)
-// {
+ImageRGB *flip_horizontal_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageFlipH = create_image_rgb(image->dim.largura, image->dim.altura);
 
-// }
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++){
+            imageFlipH->pixels[posicaoVetor(image->dim.largura, i, j)] = image->pixels[(image->dim.largura * i) + (image->dim.largura - j - 1)];
+        }
+    }
 
-// TODO RGB futuro
-// ImageRGB *transpose_rgb(const ImageRGB *image)
-// {
+    return imageFlipH;
+}
 
-// }
 
+ImageRGB *rotate_90_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageRotate = create_image_rgb(image->dim.altura, image->dim.largura);
+
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, j, (imageRotate->dim.largura - 1 - i))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
+
+    return imageRotate;
+}
+
+ImageRGB *rotate_90_anti_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageRotate = create_image_rgb(image->dim.altura, image->dim.largura);
+
+    //Rotacionar no sentido anti horário
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageRotate->pixels[posicaoVetor(imageRotate->dim.largura, imageRotate->dim.altura, i) - imageRotate->dim.largura * (j + 1)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
+
+    return imageRotate;
+}
+
+
+ImageRGB *transpose_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageTranspose = create_image_rgb(image->dim.altura, image->dim.largura);
+
+    //Transpose - inverte diagonais direita superior e esqueda inferior
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageTranspose->pixels[posicaoVetor(image->dim.altura, j, i)] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
+    
+    return imageTranspose;
+}
+
+ImageRGB *transpose2_rgb(const ImageRGB *image)
+{
+    ImageRGB *imageTranspose = create_image_rgb(image->dim.altura, image->dim.largura);
+
+    //Transpose - inverte diagonais esquerda superior e direita inferior
+    for(int i = 0; i < image->dim.altura; i++){
+        for(int j = 0; j < image->dim.largura; j++)
+            imageTranspose->pixels[posicaoVetor(image->dim.altura, (image->dim.largura - j - 1), (image->dim.altura - i - 1))] = image->pixels[posicaoVetor(image->dim.largura, i, j)];
+    }
+    
+    return imageTranspose;
+}
 
 ///////////// Funções de Manipulação por Pixel /////////////
 
@@ -1047,16 +1149,151 @@ ImageGray *negativo_gray(const ImageGray *image)
     return result;
 }
 
-// TODO RGB futuro
-// ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
-// {
 
-// }
+ImageRGB *clahe_rgb(const ImageRGB *image, int tile_width, int tile_height)
+{
+    int caixaX, caixaY;
 
-// ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
-// {
+    caixaX = calculaCaixas(image->dim.largura, tile_width);
+    caixaY = calculaCaixas(image->dim.altura, tile_height);
 
-// }
+    // ImageGray *resultado = create_image_gray(image->dim.largura, image->dim.altura);
+    ImageRGB *resultado = copiarImagemRGB(image);
+    int tamVet = tile_height * tile_width;
+
+    int *vetorRed = alocarInt(tamVet);
+    int *vetorGreen = alocarInt(tamVet);
+    int *vetorBlue = alocarInt(tamVet);
+
+    int ***histogramasRed = alocarMatrizInt3(caixaY, caixaX, 256);
+    int ***histogramasGreen = alocarMatrizInt3(caixaY, caixaX, 256);
+    int ***histogramasBlue = alocarMatrizInt3(caixaY, caixaX, 256);
+
+    int *histogramaRed = alocarInt(256);
+    int *histogramaGreen = alocarInt(256);
+    int *histogramaBlue = alocarInt(256);
+
+    float clip_limit = clipLimitGlobal;
+    for(int a = 0; a < caixaY; a++)
+    {
+        for(int b = 0, tam = 0; b < caixaX; b++, tam = 0)
+        {
+            // Monta o Tile
+            for(int i = 0, posI = a * tile_height; i < tile_height && posI < image->dim.altura; i++, posI++)
+            {
+                for(int j = 0, posJ = b * tile_width; j < tile_width && posJ < image->dim.largura; j++, posJ++, tam++)
+                {
+                    vetorRed[tam] = image->pixels[posicaoVetor(image->dim.largura, posI, posJ)].red;
+                    vetorGreen[tam] = image->pixels[posicaoVetor(image->dim.largura, posI, posJ)].green;
+                    vetorBlue[tam] = image->pixels[posicaoVetor(image->dim.largura, posI, posJ)].blue;
+                }
+            }
+            
+            // Monta o Histograma
+            for(int i = 0; i < tam; i++)
+            {
+                histogramaRed[vetorRed[i]]++;
+                histogramaGreen[vetorGreen[i]]++;
+                histogramaBlue[vetorBlue[i]]++;
+            }
+
+            redistribuirHistograma(histogramaRed, clip_limit);
+            redistribuirHistograma(histogramaGreen, clip_limit);
+            redistribuirHistograma(histogramaBlue, clip_limit);
+
+            normaliza_histograma(histogramaRed, histogramasRed[a][b]);
+            normaliza_histograma(histogramaGreen, histogramasGreen[a][b]);
+            normaliza_histograma(histogramaBlue, histogramasBlue[a][b]);
+
+            limparVet(vetorRed, tam);
+            limparVet(vetorGreen, tam);
+            limparVet(vetorBlue, tam);
+
+            limparVet(histogramaRed, 256);
+            limparVet(histogramaGreen, 256);
+            limparVet(histogramaBlue, 256);
+        }
+    }
+    histogramaRed = liberarVetor(histogramaRed);
+    histogramaGreen = liberarVetor(histogramaGreen);
+    histogramaBlue = liberarVetor(histogramaBlue);
+
+    vetorRed = liberarVetor(vetorRed);
+    vetorGreen = liberarVetor(vetorGreen);
+    vetorBlue = liberarVetor(vetorBlue);
+
+    suavizaRGB(resultado, histogramasRed, histogramasGreen, histogramasBlue, tile_width, tile_height);
+    
+    histogramasRed = liberarMatrizInt3(histogramasRed, caixaY, caixaX);
+    histogramasGreen = liberarMatrizInt3(histogramasGreen, caixaY, caixaX);
+    histogramasBlue = liberarMatrizInt3(histogramasBlue, caixaY, caixaX);
+
+    return resultado;
+}
+
+ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
+{
+    if(kernel_size % 2 == 0)
+    {
+        printf("Kernel size deve ser ímpar");
+        return NULL;
+    }
+
+    ImageRGB *blur = copiarImagemRGB(image);
+
+    int tam = kernel_size / 2, meio, quant;
+    int *vetorRed = alocarInt(kernel_size * kernel_size);
+    int *vetorGreen = alocarInt(kernel_size * kernel_size);
+    int *vetorBlue = alocarInt(kernel_size * kernel_size);
+    for(int i = 0; i < image->dim.altura; i++)
+    {
+        for(int j = 0; j < image->dim.largura; j++)
+        {
+            quant = 0;
+            for(int i2 = 0, posY = i - tam; i2 < kernel_size; i2++, posY++)
+            {
+                if(posY < 0)
+                    posY += 512;
+                else if(posY >= 512)
+                    posY -= 512;
+
+                for(int j2 = 0, posX = j - tam; j2 < kernel_size; j2++, posX++, quant++)
+                {
+                    if(posX < 0)
+                        posX += 512;
+                    else if(posX >= 512)
+                        posX -= 512;
+                        
+                    vetorRed[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].red;
+                    vetorGreen[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].green;
+                    vetorBlue[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].blue;
+                }
+            }
+            meio = posicaoVetor(image->dim.largura, i, j);
+            blur->pixels[meio].red = mediana(vetorRed, quant);
+            blur->pixels[meio].green = mediana(vetorGreen, quant);
+            blur->pixels[meio].blue = mediana(vetorBlue, quant);
+        }
+    }
+    vetorRed = liberarVetor(vetorRed);
+    vetorGreen = liberarVetor(vetorGreen);
+    vetorBlue = liberarVetor(vetorBlue);
+    return blur;
+}
+
+ImageRGB *negativo_rgb(const ImageRGB *image)
+{
+    ImageRGB *result = create_image_rgb(image->dim.largura, image->dim.altura);
+
+    for(int i = 0; i < result->dim.altura * result->dim.largura; i++)
+    {
+        result->pixels[i].red = 255 - image->pixels[i].red;
+        result->pixels[i].green = 255 - image->pixels[i].green;
+        result->pixels[i].blue = 255 - image->pixels[i].blue;
+    }
+    
+    return result;
+}
 
 ////////////////////////////////////////////////////////////
 
@@ -1077,15 +1314,31 @@ void exibirImagemGray(Historico_Gray *atual)
     gtk_grid_attach(GTK_GRID(grid), resultado, 16, 0, 16, 16);
 }
 
+void exibirImagemRGB(Historico_RGB *atual)
+{
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
+    
+    if (!pixbuf)
+    {
+        g_print("Erro ao carregar a imagem\n");
+        exit(EXIT_FAILURE);
+    }
+
+    GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
+    g_object_unref(pixbuf);
+
+    gtk_widget_set_size_request(resultado, atual->img->dim.largura, atual->img->dim.altura);
+    gtk_grid_attach(GTK_GRID(grid), resultado, 16, 0, 16, 16);
+}
+
 //////////////////   Funções para as operações do Histórico   //////////////////// 
 
-// TODO RGB futuro [Todo o histórico]
-Historico_Gray *criar_lista(){
+Historico_Gray *criar_lista_gray(){
     return NULL;
 }
 
 //cria um novo elemento para o historico
-Historico_Gray *criar_No(){
+Historico_Gray *criar_No_gray(){
     Historico_Gray *no = (Historico_Gray *) malloc(sizeof(Historico_Gray));
     if(!no){
         printf("Erro ao alocar o novo nó.");
@@ -1100,8 +1353,8 @@ Historico_Gray *criar_No(){
 }
 
 //adiciona a ultima edição ao final do historico
-Historico_Gray *add_historico(ImageGray *image, Historico_Gray *l, const char *nome){
-    Historico_Gray *novo = criar_No();
+Historico_Gray *add_historico_gray(ImageGray *image, Historico_Gray *l, const char *nome){
+    Historico_Gray *novo = criar_No_gray();
     novo->img = image;
     novo->nome = strdup(nome);  //cria uma cópia de nome
 
@@ -1119,7 +1372,7 @@ Historico_Gray *add_historico(ImageGray *image, Historico_Gray *l, const char *n
 }
 
 //percorre para a proxima edição
-Historico_Gray *next_Image(Historico_Gray *atual){
+Historico_Gray *next_Image_gray(Historico_Gray *atual){
     if(atual != NULL)
     {
         if(atual->prox != NULL){
@@ -1137,7 +1390,7 @@ Historico_Gray *next_Image(Historico_Gray *atual){
 }
 
 //percorre para a edição anterior
-Historico_Gray *prev_Image(Historico_Gray *atual){
+Historico_Gray *prev_Image_gray(Historico_Gray *atual){
     if(atual != NULL)
     {
         if(atual->ant != NULL){
@@ -1155,7 +1408,7 @@ Historico_Gray *prev_Image(Historico_Gray *atual){
 }
 
 //libera a memória do historico de imagens
-void free_Historico(Historico_Gray *l){
+void free_Historico_gray(Historico_Gray *l){
     Historico_Gray *aux;
 
     while(l != NULL){
@@ -1167,30 +1420,116 @@ void free_Historico(Historico_Gray *l){
         free(aux);
     }
 }
+
+
+Historico_RGB *criar_lista_rgb(){
+    return NULL;
+}
+
+//cria um novo elemento para o historico
+Historico_RGB *criar_No_rgb(){
+    Historico_RGB *no = (Historico_RGB *) malloc(sizeof(Historico_RGB));
+    if(!no){
+        printf("Erro ao alocar o novo nó.");
+        exit(EXIT_FAILURE);
+    }
+
+    no->png = NULL;
+    no->prox = NULL;
+    no->ant = NULL;
+
+    return no;
+}
+
+//adiciona a ultima edição ao final do historico
+Historico_RGB *add_historico_rgb(ImageRGB *image, Historico_RGB *l, const char *nome){
+    Historico_RGB *novo = criar_No_rgb();
+    novo->img = image;
+    novo->nome = strdup(nome);  //cria uma cópia de nome
+
+    if(l == NULL)
+        return novo;
+    
+    Historico_RGB *aux = l;
+    while(aux->prox != NULL)
+        aux = aux->prox;
+
+    aux->prox = novo;
+    novo->ant = aux;
+
+    return novo;
+}
+
+//percorre para a proxima edição
+Historico_RGB *next_Image_rgb(Historico_RGB *atual){
+    if(atual != NULL)
+    {
+        if(atual->prox != NULL){
+            atual = atual->prox;
+            printf("Imagem atual:\n");
+            printf("\"%s\"\n\n", atual->nome);
+        }
+        else{
+            printf("Você chegou a ultima imagem.\n");
+            printf("\"%s\"\n", atual->nome);
+        }
+        exibirImagemRGB(atual);
+    }
+    return atual;
+}
+
+//percorre para a edição anterior
+Historico_RGB *prev_Image_rgb(Historico_RGB *atual){
+    if(atual != NULL)
+    {
+        if(atual->ant != NULL){
+            atual = atual->ant;
+            printf("Imagem atual:\n");
+            printf("\"%s\"\n\n", atual->nome);
+        }
+        else{
+            printf("Você chegou a primeira imagem.\n");
+            printf("\"%s\"\n", atual->nome);
+        }
+        exibirImagemRGB(atual);
+    }
+    return atual;
+}
+
+//libera a memória do historico de imagens
+void free_Historico_rgb(Historico_RGB *l){
+    Historico_RGB *aux;
+
+    while(l != NULL){
+        aux = l;
+        l = l->prox;
+        free_image_rgb(aux->img);
+        aux->nome = liberarVetor(aux->nome);
+        aux->png = liberarVetor(aux->png);
+        free(aux);
+    }
+}
+
 ///////////////////////////////////////////////////////////////
 
 ////////////////////// SALVAR IMAGEM //////////////////////
 
-void salvar(ImageGray *image, char *pasta, char *nome){
+void salvar_gray(ImageGray *image, char *pasta, char *nome){
     char *caminho = gerarCaminho(pasta, "/", nome);
     char *txt = gerarCaminho(caminho, ".", "txt");
     char *png = gerarCaminho(caminho, ".", "png");
 
     salvarImagemGray(image, pasta, txt, png);
-    history->png = png;
-    exibirImagemGray(history);
+    historyGray->png = png;
+    exibirImagemGray(historyGray);
     
-    // system("clear");
     g_print("Imagem salva com sucesso...\n");
-    // while (getchar() != '\n');
-    // getchar();
-    // system("clear");
 
     caminho = liberarVetor(caminho);
     txt = liberarVetor(txt);
 }
 
-void salvarTudo(Historico_Gray *l, char *pasta){
+void salvarTudo_gray(Historico_Gray *l, char *pasta){
     Historico_Gray *aux = l;
 
     while(aux->ant->ant != NULL)
@@ -1198,7 +1537,38 @@ void salvarTudo(Historico_Gray *l, char *pasta){
 
     while(aux != NULL){
         g_print("Salvando imagem \"%s\"...\n\n", aux->nome);
-        salvar(aux->img, pasta, aux->nome);
+        salvar_gray(aux->img, pasta, aux->nome);
+        aux = aux->prox;
+    }
+
+    g_print("Todas as imagens foram salvas com sucesso...\n");
+}
+
+
+void salvar_rgb(ImageRGB *image, char *pasta, char *nome){
+    char *caminho = gerarCaminho(pasta, "/", nome);
+    char *txt = gerarCaminho(caminho, ".", "txt");
+    char *png = gerarCaminho(caminho, ".", "png");
+
+    salvarImagemRGB(image, pasta, txt, png);
+    historyRGB->png = png;
+    exibirImagemRGB(historyRGB);
+    
+    g_print("Imagem salva com sucesso...\n");
+
+    caminho = liberarVetor(caminho);
+    txt = liberarVetor(txt);
+}
+
+void salvarTudo_rgb(Historico_RGB *l, char *pasta){
+    Historico_RGB *aux = l;
+
+    while(aux->ant->ant != NULL)
+        aux = aux->ant;
+
+    while(aux != NULL){
+        g_print("Salvando imagem \"%s\"...\n\n", aux->nome);
+        salvar_rgb(aux->img, pasta, aux->nome);
         aux = aux->prox;
     }
 
@@ -1208,31 +1578,6 @@ void salvarTudo(Historico_Gray *l, char *pasta){
 ///////////////////////////////////////////////////////////////
 
 //////////////////////////    MENUS    ////////////////////////
-
-int menuEdicoes(){
-    int op;
-
-    do{
-        printf("=----- Edições -----=\n");
-        printf("1- Flip Vertical\n");
-        printf("2- Flip Horizontal\n");
-        printf("3- Rotacionar 90 graus\n");
-        printf("4- Transpose\n");
-        printf("5- Clahe\n");
-        printf("6- Blur\n");
-        printf("7- Negativo\n");
-        printf("0- Sair\n");
-        printf("Escolha: ");
-            if(scanf("%d", &op) != 1 || (op < 0 || op > 7)){
-                while (getchar() != '\n');
-                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
-            }
-            else
-                break;
-    } while (1);
-
-    return op;
-}
 
 Historico_Gray *edicoesGray(Historico_Gray *l, int op){
     ImageGray *editedImage = NULL;
@@ -1285,8 +1630,6 @@ Historico_Gray *edicoesGray(Historico_Gray *l, int op){
             editedImage = negativo_gray(aux->img);
             nome = strdup("negativ");
             break;
-
-
     }
 
     if(editedImage != NULL){
@@ -1294,7 +1637,7 @@ Historico_Gray *edicoesGray(Historico_Gray *l, int op){
         nome = alocarStr(strlen(aux->nome) + strlen(nome) + 2);
         sprintf(nome, "%s_%s", aux->nome, sufixo);
 
-        aux = add_historico(editedImage, l, nome);
+        aux = add_historico_gray(editedImage, l, nome);
         editedImage = NULL;
 
         sufixo = liberarVetor(sufixo);
@@ -1305,83 +1648,83 @@ Historico_Gray *edicoesGray(Historico_Gray *l, int op){
     return aux;
 }
 
-int menuHist(){
-    int op;
+Historico_RGB *edicoesRGB(Historico_RGB *l, int op){
+    ImageRGB *editedImage = NULL;
+    char *nome = NULL;
+    char *sufixo = NULL;
+    Historico_RGB *aux = l;
 
-    do{
-        printf("Historico\n");
-        printf("1- Proxima Imagem\n");
-        printf("2- Imagem anterior\n");
-        printf("0- Sair\n");
-        printf("Escolha: ");
-            if(scanf("%d", &op) != 1 || (op < 0 || op > 2)){
-                while (getchar() != '\n');
-                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
-            }
-            else
-                break;
-    } while (1);
+    switch(op){
+        case VERTICAL:
+            editedImage = flip_vertical_rgb(aux->img);
+            nome = strdup("flipV");
+            break;
 
-    return op;
+        case HORIZONTAL:
+            editedImage = flip_horizontal_rgb(aux->img);
+            nome = strdup("flipH");
+            break;
+
+        case ROTATE_90:
+            editedImage = rotate_90_rgb(aux->img);
+            nome = strdup("rot90");
+            break;
+        
+        case ROTATE_90_ANTI:
+            editedImage = rotate_90_anti_rgb(aux->img);
+            nome = strdup("rot90ant");
+            break;
+
+        case TRANSPOSE1:
+            editedImage = transpose_rgb(aux->img);
+            nome = strdup("transp1");
+            break;
+
+        case TRANSPOSE2:
+            editedImage = transpose2_rgb(aux->img);
+            nome = strdup("transp2");
+            break;
+
+        case CLAHE:
+            editedImage = clahe_rgb(aux->img, larguraClaheGlobal, alturaClaheGlobal);
+            nome = strdup("clahe");
+            break;
+
+        case BLUR:
+            editedImage = median_blur_rgb(aux->img, tileBlurGlobal);
+            nome = strdup("blur");
+            break;
+
+        case NEGATIVO:
+            editedImage = negativo_rgb(aux->img);
+            nome = strdup("negativ");
+            break;
+    }
+
+    if(editedImage != NULL){
+        sufixo = nome;
+        nome = alocarStr(strlen(aux->nome) + strlen(nome) + 2);
+        sprintf(nome, "%s_%s", aux->nome, sufixo);
+
+        aux = add_historico_rgb(editedImage, l, nome);
+        editedImage = NULL;
+
+        sufixo = liberarVetor(sufixo);
+        nome = liberarVetor(nome);
+        g_print("\nNova imagem: \"%s\"\n", aux->nome);
+    }
+
+    return aux;
 }
 
-Historico_Gray *historico(Historico_Gray *atual){
-    int op;
-
-    g_print("Imagem atual: \"%s\"\n", atual->nome);
-
-    do{
-        op = menuHist();
-        // system("clear");
-
-        switch (op) {
-            case 1:
-                atual = next_Image(atual);
-                break;
-
-            case 2:
-                atual = prev_Image(atual);
-                break;
-
-            case 0:
-                g_print("Saindo do Histórico...\n");
-                break;
-        }
-    }while(op != 0);
-
-    return atual;
-}
-
-int menuGray(){
-    int op;
-
-    do{
-        printf("=----- MENU -----=\n");
-        printf("1- Editar imagem\n");
-        printf("2- Ver historico de edições\n");
-        printf("3- Salvar imagem\n");
-        printf("4- Salvar tudo\n");
-        printf("0- Encerrar programa\n");
-        printf("Escolha: ");
-            if(scanf("%d", &op) != 1 || (op < 0 || op > 4)){
-                while (getchar() != '\n');
-                printf("Entrada inválida. Por favor, digite uma opção válida.\n");
-            }
-            else
-                break;
-    } while (1);
-
-    return op;
-}
 
 void Executar_Gray(GtkWidget *widget, gpointer data)
 {
     int op = *((int *) data);
 
-    if(history)
+    if(historyGray)
     {
-        g_print("Imagem atual: %s\n\n", history->nome);
-
+        g_print("Imagem atual: %s\n\n", historyGray->nome);
 
         if(op >= TRANSPOSE1 && op <= ALEATORIO)
         {
@@ -1394,15 +1737,15 @@ void Executar_Gray(GtkWidget *widget, gpointer data)
                 if(op == ALEATORIO)
                     aux2 = rand() % 9 + 2;
 
-                if(history->prox != NULL)
+                if(historyGray->prox != NULL)
                 {
-                    free_Historico(history->prox);
-                    history->prox = NULL;
+                    free_Historico_gray(historyGray->prox);
+                    historyGray->prox = NULL;
                 }
 
-                history = edicoesGray(history, aux2);
-                if(history != NULL)
-                    salvar(history->img, pastaOriginal, history->nome);
+                historyGray = edicoesGray(historyGray, aux2);
+                if(historyGray != NULL)
+                    salvar_gray(historyGray->img, pastaOriginal, historyGray->nome);
             }
         }
 
@@ -1411,16 +1754,74 @@ void Executar_Gray(GtkWidget *widget, gpointer data)
             switch(op)
             {
                 case ANTERIOR:
-                    history = prev_Image(history);
+                    historyGray = prev_Image_gray(historyGray);
                     break;
 
                 case PROXIMO:
-                    history = next_Image(history);
+                    historyGray = next_Image_gray(historyGray);
                     break;
 
                 case SALVAR:
-                    g_print("Salvando imagem \"%s\"...\n\n", history->nome);
-                    salvar(history->img, pastaOriginal, history->nome);
+                    g_print("Salvando imagem \"%s\"...\n\n", historyGray->nome);
+                    salvar_gray(historyGray->img, pastaOriginal, historyGray->nome);
+                    break;
+
+                case SAIR:
+                    g_print("Encerrando programa...\n");
+                    txtOriginal = liberarVetor(txtOriginal);
+                    pastaOriginal = liberarVetor(pastaOriginal);
+                    break;
+            }
+        }
+    }
+}
+
+void Executar_RGB(GtkWidget *widget, gpointer data)
+{
+    int op = *((int *) data);
+
+    if(historyRGB)
+    {
+        g_print("Imagem atual: %s\n\n", historyRGB->nome);
+
+        if(op >= TRANSPOSE1 && op <= ALEATORIO)
+        {
+            int aux = 1, aux2 = op;
+            if(op == ALEATORIO)
+                aux = randomGlobal;
+
+            for(int i = 0; i < aux; i++)
+            {
+                if(op == ALEATORIO)
+                    aux2 = rand() % 9 + 2;
+
+                if(historyRGB->prox != NULL)
+                {
+                    free_Historico_rgb(historyRGB->prox);
+                    historyRGB->prox = NULL;
+                }
+
+                historyRGB = edicoesRGB(historyRGB, aux2);
+                if(historyRGB != NULL)
+                    salvar_rgb(historyRGB->img, pastaOriginal, historyRGB->nome);
+            }
+        }
+
+        else
+        {
+            switch(op)
+            {
+                case ANTERIOR:
+                    historyRGB = prev_Image_rgb(historyRGB);
+                    break;
+
+                case PROXIMO:
+                    historyRGB = next_Image_rgb(historyRGB);
+                    break;
+
+                case SALVAR:
+                    g_print("Salvando imagem \"%s\"...\n\n", historyRGB->nome);
+                    salvar_rgb(historyRGB->img, pastaOriginal, historyRGB->nome);
                     break;
 
                 case SAIR:
@@ -1435,34 +1836,38 @@ void Executar_Gray(GtkWidget *widget, gpointer data)
 
 ///////////// Interface Gráfica /////////////
 
+void numeroDigitado(GtkEditable *entrada, gpointer user_data)
+{
+    const gchar *texto = gtk_editable_get_text(entrada);
+    int *pont = (int *) user_data;
+
+    if(validarNumero(texto))
+    {
+        int num = atoi(texto);
+        if(num > 0)
+            *pont = num;
+    }
+}
+
+void imparDigitado(GtkEditable *entrada, gpointer user_data)
+{
+    const gchar *texto = gtk_editable_get_text(entrada);
+    int *pont = (int *) user_data;
+
+    if(validarNumero(texto))
+    {
+        int num = atoi(texto);
+        if(num > 0 && num % 2 == 1)
+            *pont = num;
+    }
+}
+
+
 void criarBotaoGray(char *nome, int x, int y, int largura, int altura, int posFuncao)
 {
     GtkWidget *button = gtk_button_new_with_label(nome);
     g_signal_connect(button, "clicked", G_CALLBACK(Executar_Gray), &funcoes[posFuncao]);
     gtk_grid_attach(GTK_GRID(grid), button, x, y, largura, altura);
-}
-
-void numeroDigitadoGray(GtkEditable *entrada, gpointer user_data)
-{
-    const gchar *texto = gtk_editable_get_text(entrada);
-    int *pont = (int *) user_data;
-
-    // Verifica se o texto é um número válido
-    if (validarNumero(texto))
-        *pont = atoi(texto);
-}
-
-void imparDigitadoGray(GtkEditable *entrada, gpointer user_data)
-{
-    const gchar *texto = gtk_editable_get_text(entrada);
-    int *pont = (int *) user_data;
-
-    // Verifica se o texto é um número válido
-    if (validarNumero(texto))
-    {
-        if(atoi(texto) % 2 == 1)
-            *pont = atoi(texto);
-    }
 }
 
 void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
@@ -1490,54 +1895,60 @@ void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
     
         ImageGray *image = lerImagemGray(imagemOriginal, txtOriginal);
 
-        history = criar_lista();
-        history = add_historico(image, history, nome); //adiciona a imagem original na cabeça da lista
-        salvar(image, pastaOriginal, nome);
+        historyGray = criar_lista_gray();
+        historyGray = add_historico_gray(image, historyGray, nome); //adiciona a imagem original na cabeça da lista
+        salvar_gray(image, pastaOriginal, nome);
         
-        g_print("Imagem: \"%s\" foi adicionada\n\n", history->nome);
+        g_print("Imagem: \"%s\" foi adicionada\n\n", historyGray->nome);
 
         nome = liberarVetor(nome);
 
-        criarBotaoGray("Transpose 1", 0, TRANSPOSE1, 1, 1, TRANSPOSE1);
-        criarBotaoGray("Transpose 2", 0, TRANSPOSE2, 1, 1, TRANSPOSE2);
-        criarBotaoGray("Rotate 90", 0, ROTATE_90, 1, 1, ROTATE_90);
-        criarBotaoGray("Rotate 90 Anti", 0, ROTATE_90_ANTI, 1, 1, ROTATE_90_ANTI);
+        tileBlurGlobal = 9;
+        alturaClaheGlobal = 64;
+        larguraClaheGlobal = 64;
+        clipLimitGlobal = 40;
+        randomGlobal = 3;
+
+        criarBotaoGray("Transpose 1 ↗️", 0, TRANSPOSE1, 1, 1, TRANSPOSE1);
+        criarBotaoGray("Transpose 2 ↘️", 0, TRANSPOSE2, 1, 1, TRANSPOSE2);
+        criarBotaoGray("Rotate 90º 🔁", 0, ROTATE_90, 1, 1, ROTATE_90);
+        criarBotaoGray("Rotate 90º 🔄", 0, ROTATE_90_ANTI, 1, 1, ROTATE_90_ANTI);
         criarBotaoGray("Flip Vertical", 0, VERTICAL, 1, 1, VERTICAL);
         criarBotaoGray("Flip Horizontal", 0, HORIZONTAL, 1, 1, HORIZONTAL);
         criarBotaoGray("Median Blur", 0, BLUR, 1, 1, BLUR);
         criarBotaoGray("CLAHE", 0, CLAHE, 1, 1, CLAHE);
         criarBotaoGray("Negativo", 0, NEGATIVO+1, 1, 1, NEGATIVO);
-        criarBotaoGray("Aleatorio", 0, ALEATORIO+1, 1, 1, ALEATORIO);
+        criarBotaoGray("Aleatório", 0, ALEATORIO+1, 1, 1, ALEATORIO);
         criarBotaoGray("Imagem Anterior", 0, ANTERIOR+1, 1, 1, ANTERIOR);
         criarBotaoGray("Imagem Seguinte", 1, ANTERIOR+1, 1, 1, PROXIMO);
         criarBotaoGray("Salvar", 0, SALVAR, 1, 1, SALVAR);
 
         GtkWidget *entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Tamanho: ");
-        g_signal_connect(entrada, "changed", G_CALLBACK(imparDigitadoGray), &tileBlurGlobal);
+        g_signal_connect(entrada, "changed", G_CALLBACK(imparDigitado), &tileBlurGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 1, BLUR, 1, 1);
 
         entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Clip Limit: ");
-        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &clipLimitGlobal);
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &clipLimitGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE, 1, 1);
 
         entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Largura: ");
-        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &larguraClaheGlobal);
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &larguraClaheGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 0, CLAHE+1, 1, 1);
 
         entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Altura: ");
-        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &alturaClaheGlobal);
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &alturaClaheGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE+1, 1, 1);
 
         entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Quantidade: ");
-        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitadoGray), &randomGlobal);
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &randomGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 1, ALEATORIO+1, 1, 1);
 
-        exibirImagemGray(history);
+        exibirImagemGray(historyGray);
     }
     else
         g_print("Você cancelou\n");
@@ -1556,6 +1967,112 @@ void selecionaGray(GtkWidget *widget, gpointer window)
                          window);
 }
 
+
+void criarBotaoRGB(char *nome, int x, int y, int largura, int altura, int posFuncao)
+{
+    GtkWidget *button = gtk_button_new_with_label(nome);
+    g_signal_connect(button, "clicked", G_CALLBACK(Executar_RGB), &funcoes[posFuncao]);
+    gtk_grid_attach(GTK_GRID(grid), button, x, y, largura, altura);
+}
+
+void janelaRGB(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
+{
+    GError *error = NULL;
+    GFile *file = gtk_file_dialog_open_finish(dialog, res, &error);
+
+    if(error != NULL)
+    {
+        g_print("Erro ao selecionar a imagem: %s\n", error->message);
+        g_error_free(error);
+    }
+    else if(file != NULL)
+    {
+        char *imagemOriginal = g_file_get_path(file);
+        g_print("Imagem selecionada: %s\n", imagemOriginal);
+        g_object_unref(file);
+
+        char *nome = nomeCaminho(imagemOriginal);
+        
+        char *caminhoOriginal = "imagens";
+        pastaOriginal = pastaPrincipal(caminhoOriginal);
+        char *caminho1 = gerarCaminho(pastaOriginal, "/", nome);
+        txtOriginal = gerarCaminho(caminho1, ".", "txt");
+    
+        ImageRGB *image = lerImagemRGB(imagemOriginal, txtOriginal);
+    
+        historyRGB = criar_lista_rgb();
+        historyRGB = add_historico_rgb(image, historyRGB, nome); //adiciona a imagem original na cabeça da lista
+        salvar_rgb(image, pastaOriginal, nome);
+        
+        g_print("Imagem: \"%s\" foi adicionada\n\n", historyRGB->nome);
+
+        nome = liberarVetor(nome);
+
+        tileBlurGlobal = 9;
+        alturaClaheGlobal = 64;
+        larguraClaheGlobal = 64;
+        clipLimitGlobal = 40;
+        randomGlobal = 3;
+
+        criarBotaoRGB("Transpose 1 ↗️", 0, TRANSPOSE1, 1, 1, TRANSPOSE1);
+        criarBotaoRGB("Transpose 2 ↘️", 0, TRANSPOSE2, 1, 1, TRANSPOSE2);
+        criarBotaoRGB("Rotate 90º 🔁", 0, ROTATE_90, 1, 1, ROTATE_90);
+        criarBotaoRGB("Rotate 90º 🔄", 0, ROTATE_90_ANTI, 1, 1, ROTATE_90_ANTI);
+        criarBotaoRGB("Flip Vertical", 0, VERTICAL, 1, 1, VERTICAL);
+        criarBotaoRGB("Flip Horizontal", 0, HORIZONTAL, 1, 1, HORIZONTAL);
+        criarBotaoRGB("Median Blur", 0, BLUR, 1, 1, BLUR);
+        criarBotaoRGB("CLAHE", 0, CLAHE, 1, 1, CLAHE);
+        criarBotaoRGB("Negativo", 0, NEGATIVO+1, 1, 1, NEGATIVO);
+        criarBotaoRGB("Aleatório", 0, ALEATORIO+1, 1, 1, ALEATORIO);
+        criarBotaoRGB("Imagem Anterior", 0, ANTERIOR+1, 1, 1, ANTERIOR);
+        criarBotaoRGB("Imagem Seguinte", 1, ANTERIOR+1, 1, 1, PROXIMO);
+        criarBotaoRGB("Salvar", 0, SALVAR, 1, 1, SALVAR);
+
+        GtkWidget *entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Tamanho: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(imparDigitado), &tileBlurGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, BLUR, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Clip Limit: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &clipLimitGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Largura: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &larguraClaheGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 0, CLAHE+1, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Altura: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &alturaClaheGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, CLAHE+1, 1, 1);
+
+        entrada = gtk_entry_new();
+        gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Quantidade: ");
+        g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &randomGlobal);
+        gtk_grid_attach(GTK_GRID(grid), entrada, 1, ALEATORIO+1, 1, 1);
+
+        exibirImagemRGB(historyRGB);
+    }
+    else
+        g_print("Você cancelou\n");
+}
+
+void selecionaRGB(GtkWidget *widget, gpointer window)
+{
+    // Cria uma nova caixa de diálogo de seleção de arquivos usando GtkFileDialog
+    GtkFileDialog *dialog = gtk_file_dialog_new();
+
+    // Configura as opções de diálogo (abrir arquivos)
+    gtk_file_dialog_open(dialog,
+                         GTK_WINDOW(window),
+                         NULL,
+                         (GAsyncReadyCallback) janelaRGB,
+                         window);
+}
+
+
 static void activate(GtkApplication *app, gpointer user_data)
 {
     GtkWidget *window;
@@ -1571,9 +2088,9 @@ static void activate(GtkApplication *app, gpointer user_data)
     // "Linka" a grid com a janela
     gtk_window_set_child(GTK_WINDOW(window), grid);
 
-    // button = gtk_button_new_with_label("Abrir RGB");
-    // g_signal_connect(button, "clicked", G_CALLBACK(selecionaImagem), window);
-    // gtk_grid_attach(GTK_GRID(grid), button, 0, RGB, 1, 1);
+    button = gtk_button_new_with_label("Abrir RGB");
+    g_signal_connect(button, "clicked", G_CALLBACK(selecionaRGB), NULL);
+    gtk_grid_attach(GTK_GRID(grid), button, 0, RGB, 1, 1);
 
     button = gtk_button_new_with_label("Abrir Gray");
     g_signal_connect(button, "clicked", G_CALLBACK(selecionaGray), NULL);
