@@ -44,6 +44,8 @@ char *pastaOriginal;
 char *txtOriginal;
 
 GtkWidget *grid;
+GtkWidget *imagemAtual = NULL;
+Dimensoes tela;
 
 //struct dos nós da lista duplamente encadeada, usada no histórico
 typedef struct historico_gray
@@ -103,7 +105,7 @@ int validarNumero(const gchar *str)
 {
     for(int i = 0; str[i] != '\0'; i++)
     {
-        if (!isdigit(str[i]))
+        if(!isdigit(str[i]))
             return 0;
     }
     return 1;
@@ -368,13 +370,13 @@ PyObject **inicializaPython(char *funcao, char *image_path, char *output_path, i
     matriz[SCRIPT] = PyImport_Import(nomeScript);
     Py_DECREF(nomeScript); // Libera a memória de um PyObject
 
-    if (matriz[SCRIPT] != NULL)
+    if(matriz[SCRIPT] != NULL)
     {
         // "Importa" a função passada como parâmetro
         matriz[FUNCAO] = PyObject_GetAttrString(matriz[SCRIPT], funcao);
 
         // Verifica se a função é "chamável"
-        if (PyCallable_Check(matriz[FUNCAO]))
+        if(PyCallable_Check(matriz[FUNCAO]))
             return matriz;
         
         Py_DECREF(matriz[SCRIPT]);
@@ -388,7 +390,7 @@ void executaPython(PyObject **matriz)
 {
     PyObject *retorno = PyObject_CallObject(matriz[FUNCAO], matriz[ARGUMENTOS]);
 
-    if (!retorno)
+    if(!retorno)
     {
         PyErr_Print();
         exit(EXIT_FAILURE);
@@ -757,9 +759,9 @@ ImageGray *lerTxtGray(char *caminho)
     FILE *arquivo = lerArquivo(caminho, "r");
     
     int altura, largura;
-    fscanf(arquivo, "%d", &altura);
-    fgetc(arquivo);
     fscanf(arquivo, "%d", &largura);
+    fgetc(arquivo);
+    fscanf(arquivo, "%d", &altura);
     fgetc(arquivo);
 
     ImageGray *imagem = create_image_gray(largura, altura);
@@ -782,9 +784,9 @@ ImageRGB *lerTxtRGB(char *caminho)
     FILE *arquivo = lerArquivo(caminho, "r");
     
     int altura, largura;
-    fscanf(arquivo, "%d", &altura);
-    fgetc(arquivo);
     fscanf(arquivo, "%d", &largura);
+    fgetc(arquivo);
+    fscanf(arquivo, "%d", &altura);
     fgetc(arquivo);
 
     ImageRGB *imagem = create_image_rgb(largura, altura);
@@ -823,9 +825,9 @@ void salvarTxtGray(ImageGray *imagem, char *caminho, char *txt)
 
     FILE *arquivo = lerArquivo(txt, "w");
 
-    fprintf(arquivo, "%d", imagem->dim.altura);
-    fputc('\n', arquivo);
     fprintf(arquivo, "%d", imagem->dim.largura);
+    fputc('\n', arquivo);
+    fprintf(arquivo, "%d", imagem->dim.altura);
     fputc('\n', arquivo);
 
     for(int i = 0; i < imagem->dim.altura; i++)
@@ -847,9 +849,9 @@ void salvarTxtRGB(ImageRGB *imagem, char *caminho, char *txt)
 
     FILE *arquivo = lerArquivo(txt, "w");
 
-    fprintf(arquivo, "%d", imagem->dim.altura);
-    fputc('\n', arquivo);
     fprintf(arquivo, "%d", imagem->dim.largura);
+    fputc('\n', arquivo);
+    fprintf(arquivo, "%d", imagem->dim.altura);
     fputc('\n', arquivo);
 
     for(int i = 0; i < imagem->dim.altura; i++)
@@ -1117,16 +1119,16 @@ ImageGray *median_blur_gray(const ImageGray *image, int kernel_size)
             for(int i2 = 0, posY = i - tam; i2 < kernel_size; i2++, posY++)
             {
                 if(posY < 0)
-                    posY += 512;
-                else if(posY >= 512)
-                    posY -= 512;
+                    posY += image->dim.altura;
+                else if(posY >= image->dim.altura)
+                    posY -= image->dim.altura;
 
                 for(int j2 = 0, posX = j - tam; j2 < kernel_size; j2++, posX++, quant++)
                 {
                     if(posX < 0)
-                        posX += 512;
-                    else if(posX >= 512)
-                        posX -= 512;
+                        posX += image->dim.largura;
+                    else if(posX >= image->dim.largura)
+                        posX -= image->dim.largura;
                         
                     vetor[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].value;
                 }
@@ -1253,16 +1255,16 @@ ImageRGB *median_blur_rgb(const ImageRGB *image, int kernel_size)
             for(int i2 = 0, posY = i - tam; i2 < kernel_size; i2++, posY++)
             {
                 if(posY < 0)
-                    posY += 512;
-                else if(posY >= 512)
-                    posY -= 512;
+                    posY += image->dim.altura;
+                else if(posY >= image->dim.altura)
+                    posY -= image->dim.altura;
 
                 for(int j2 = 0, posX = j - tam; j2 < kernel_size; j2++, posX++, quant++)
                 {
                     if(posX < 0)
-                        posX += 512;
-                    else if(posX >= 512)
-                        posX -= 512;
+                        posX += image->dim.largura;
+                    else if(posX >= image->dim.largura)
+                        posX -= image->dim.largura;
                         
                     vetorRed[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].red;
                     vetorGreen[quant] = image->pixels[posicaoVetor(image->dim.largura, posY, posX)].green;
@@ -1297,11 +1299,31 @@ ImageRGB *negativo_rgb(const ImageRGB *image)
 
 ////////////////////////////////////////////////////////////
 
+Dimensoes calculaTela(Dimensoes imagem)
+{
+    if(imagem.altura > tela.altura || imagem.largura > tela.largura)
+    {
+        if(imagem.altura > tela.altura)
+        {
+            imagem.largura = imagem.largura * tela.altura / imagem.altura;
+            imagem.altura = tela.altura;
+        }
+
+        if(imagem.largura > tela.largura)
+        {
+            imagem.altura = imagem.altura * tela.largura / imagem.largura;
+            imagem.largura = tela.largura;
+        }
+    }
+
+    return imagem;
+}
+
 void exibirImagemGray(Historico_Gray *atual)
 {
     GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
     
-    if (!pixbuf)
+    if(!pixbuf)
     {
         g_print("Erro ao carregar a imagem\n");
         exit(EXIT_FAILURE);
@@ -1310,15 +1332,21 @@ void exibirImagemGray(Historico_Gray *atual)
     GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
     g_object_unref(pixbuf);
 
-    gtk_widget_set_size_request(resultado, atual->img->dim.largura, atual->img->dim.altura);
-    gtk_grid_attach(GTK_GRID(grid), resultado, 16, 0, 16, 16);
+    Dimensoes imagem = calculaTela(atual->img->dim);
+
+    if(imagemAtual != NULL)
+        gtk_grid_remove(GTK_GRID(grid), imagemAtual);
+
+    imagemAtual = resultado;
+    gtk_widget_set_size_request(resultado, imagem.largura, imagem.altura);
+    gtk_grid_attach(GTK_GRID(grid), resultado, 4, 0, 16, 16);
 }
 
 void exibirImagemRGB(Historico_RGB *atual)
 {
     GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
     
-    if (!pixbuf)
+    if(!pixbuf)
     {
         g_print("Erro ao carregar a imagem\n");
         exit(EXIT_FAILURE);
@@ -1327,8 +1355,14 @@ void exibirImagemRGB(Historico_RGB *atual)
     GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
     g_object_unref(pixbuf);
 
-    gtk_widget_set_size_request(resultado, atual->img->dim.largura, atual->img->dim.altura);
-    gtk_grid_attach(GTK_GRID(grid), resultado, 16, 0, 16, 16);
+    Dimensoes imagem = calculaTela(atual->img->dim);
+
+    if(imagemAtual != NULL)
+        gtk_grid_remove(GTK_GRID(grid), imagemAtual);
+
+    imagemAtual = resultado;
+    gtk_widget_set_size_request(resultado, imagem.largura, imagem.altura);
+    gtk_grid_attach(GTK_GRID(grid), resultado, 4, 0, 16, 16);
 }
 
 //////////////////   Funções para as operações do Histórico   //////////////////// 
@@ -2104,10 +2138,15 @@ static void activate(GtkApplication *app, gpointer user_data)
     gtk_window_present(GTK_WINDOW(window));
 }
 
+
 int iniciar(int argc, char **argv)
 {
+    tela.largura = 800;
+    tela.altura = 600;
+    
     GtkApplication *app;
     int status;
+    
     srand(time(NULL));
 
     app = gtk_application_new("org.gtk.example", G_APPLICATION_DEFAULT_FLAGS);
