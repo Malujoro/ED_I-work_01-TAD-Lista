@@ -4,6 +4,7 @@
         "types.h": "c",
         "python.h": "c",
         "stat.h": "c",
-        "dirent.h": "c"
+        "dirent.h": "c",
+        "image.h": "c"
     }
 }
