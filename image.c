@@ -30,9 +30,10 @@
 #define ANTERIOR 12
 #define PROXIMO 13
 #define SALVAR 14
-#define SAIR 15
+#define SALVARTODOS 15
+#define SAIR 16
 
-int funcoes[] = {RGB, GRAY, TRANSPOSE1, TRANSPOSE2, ROTATE_90, ROTATE_90_ANTI, VERTICAL, HORIZONTAL, BLUR, CLAHE, NEGATIVO, ALEATORIO, ANTERIOR, PROXIMO, SALVAR, SAIR};
+int funcoes[] = {RGB, GRAY, TRANSPOSE1, TRANSPOSE2, ROTATE_90, ROTATE_90_ANTI, VERTICAL, HORIZONTAL, BLUR, CLAHE, NEGATIVO, ALEATORIO, ANTERIOR, PROXIMO, SALVAR, SALVARTODOS, SAIR};
 
 int tileBlurGlobal = 9;
 int alturaClaheGlobal = 64;
@@ -52,7 +53,6 @@ typedef struct historico_gray
 {
     ImageGray *img;
     char *nome;
-    char *png;
     struct historico_gray *prox;
     struct historico_gray *ant;
 } Historico_Gray;
@@ -61,7 +61,6 @@ typedef struct historico_rgb
 {
     ImageRGB *img;
     char *nome;
-    char *png;
     struct historico_rgb *prox;
     struct historico_rgb *ant;
 } Historico_RGB;
@@ -69,69 +68,6 @@ typedef struct historico_rgb
 Historico_Gray *historyGray;
 Historico_RGB *historyRGB;
 
-//////////////////// Funções auxiliares ////////////////////
-
-// Função para converter uma posição de matriz em posição de vetor
-int posicaoVetor(int largura, int i, int j)
-{
-    return largura * i + j;
-}
-
-void limparVet(int *vetor, int tam)
-{
-    for(int i = 0; i < tam; i++)
-        vetor[i] = 0;
-}
-
-// Função para converter um Inteiro em String
-char *intParaStr(int num)
-{
-    int tam, quant;
-    for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
-
-    char *result = alocarStr(quant);
-
-    for(int i = 0; i < quant; i++)
-    {
-        result[i] = '0' + num / tam;
-        num %= tam;
-        tam /= 10;
-    }
-    result[quant] = '\0';
-    return result;
-}
-
-int validarNumero(const gchar *str)
-{
-    for(int i = 0; str[i] != '\0'; i++)
-    {
-        if(!isdigit(str[i]))
-            return 0;
-    }
-    return 1;
-}
-
-char *nomeCaminho(char *imagem)
-{
-    int posPonto = strlen(imagem), posBarra = -1;
-
-    for(int i = 0; imagem[i] != '\0'; i++)
-    {
-        if(imagem[i] == '.')
-            posPonto = i;
-        else if(imagem[i] == '/')
-            posBarra = i;
-    }
-
-    int tam = posPonto - posBarra;
-    char *nome = alocarStr(tam);
-
-    for(int i = posBarra+1, j = 0; i < posPonto && j < tam; i++, j++)
-        nome[j] = imagem[i];
-    nome[tam-1] = '\0';
-
-    return nome;
-}
 /////////////// Alocação ///////////////
 
 FILE *lerArquivo(char *caminho, char *modo)
@@ -154,6 +90,19 @@ char *alocarStr(int tam)
     if(!vetor)
     {
         printf("Erro ao alocar string");
+        exit(EXIT_FAILURE);
+    }
+
+    return vetor;
+}
+
+guchar *alocarGuchar(int tam)
+{
+    guchar *vetor = g_malloc(tam);
+
+    if(!vetor)
+    {
+        printf("Erro ao alocar guchar");
         exit(EXIT_FAILURE);
     }
 
@@ -271,6 +220,70 @@ void *liberarMatrizInt3(int ***matriz, int lin, int col)
     }
     free(matriz);
     return NULL;
+}
+
+//////////////////// Funções auxiliares ////////////////////
+
+// Função para converter uma posição de matriz em posição de vetor
+int posicaoVetor(int largura, int i, int j)
+{
+    return largura * i + j;
+}
+
+void limparVet(int *vetor, int tam)
+{
+    for(int i = 0; i < tam; i++)
+        vetor[i] = 0;
+}
+
+// Função para converter um Inteiro em String
+char *intParaStr(int num)
+{
+    int tam, quant;
+    for(tam = 1, quant = 1; tam*10 <= num; tam *= 10, quant++);
+
+    char *result = alocarStr(quant);
+
+    for(int i = 0; i < quant; i++)
+    {
+        result[i] = '0' + num / tam;
+        num %= tam;
+        tam /= 10;
+    }
+    result[quant] = '\0';
+    return result;
+}
+
+int validarNumero(const gchar *str)
+{
+    for(int i = 0; str[i] != '\0'; i++)
+    {
+        if(!isdigit(str[i]))
+            return 0;
+    }
+    return 1;
+}
+
+char *nomeCaminho(char *imagem)
+{
+    int posPonto = strlen(imagem), posBarra = -1;
+
+    for(int i = 0; imagem[i] != '\0'; i++)
+    {
+        if(imagem[i] == '.')
+            posPonto = i;
+        else if(imagem[i] == '/')
+            posBarra = i;
+    }
+
+    int tam = posPonto - posBarra;
+    char *nome = alocarStr(tam);
+
+    for(int i = posBarra+1, j = 0; i < posPonto && j < tam; i++, j++)
+        nome[j] = imagem[i];
+    nome[tam-1] = '\0';
+
+    return nome;
 }
 
 //////////////// Pastas ////////////////
@@ -491,6 +504,27 @@ int cdf_normalizado(int cdf_i, int cdf_min, int cdf_max)
     return ((float) (cdf_i - cdf_min)) / (cdf_max - cdf_min) * 255;
 }
 
+int posMinimo(int *histograma)
+{
+    for(int i = 0; i < 256; i++)
+    {
+        if(histograma[i] != 0)
+            return i;
+    }
+    return 0;
+}
+
+int posMenor(int *histograma)
+{
+    int posicao = 0;
+    for(int i = 1; i < 256; i++)
+    {
+        if(histograma[i] < histograma[posicao])
+            posicao = i;
+    }
+    return posicao;
+}
+
 int normaliza_histograma(int *histograma, int *resultado)
 {
     int minimo = cdf(histograma, posMinimo(histograma));
@@ -556,27 +590,6 @@ void redistribuirHistograma(int *histograma, int clip_limit)
         }
     }while(limite);
     aux = liberarVetor(aux);
-}
-
-int posMinimo(int *histograma)
-{
-    for(int i = 0; i < 256; i++)
-    {
-        if(histograma[i] != 0)
-            return i;
-    }
-    return 0;
-}
-
-int posMenor(int *histograma)
-{
-    int posicao = 0;
-    for(int i = 1; i < 256; i++)
-    {
-        if(histograma[i] < histograma[posicao])
-            posicao = i;
-    }
-    return posicao;
 }
 
 float interpolacaoBilinear(float x, float y, int ponto[][2])
@@ -1321,16 +1334,38 @@ Dimensoes calculaTela(Dimensoes imagem)
 
 void exibirImagemGray(Historico_Gray *atual)
 {
-    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
-    
+    int altura = atual->img->dim.altura;
+    int largura = atual->img->dim.largura;
+
+    guchar *pixels = alocarGuchar(altura * largura * 3);
+    for (int i = 0; i < altura * largura; i++)
+    {
+            pixels[i * 3] = (guchar) atual->img->pixels[i].value;
+            pixels[i * 3 + 1] = (guchar) atual->img->pixels[i].value;
+            pixels[i * 3 + 2] = (guchar) atual->img->pixels[i].value;
+    }
+
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_data(pixels,
+                                                GDK_COLORSPACE_RGB,
+                                                FALSE,
+                                                8,
+                                                largura,
+                                                altura,
+                                                largura * 3,
+                                                (GdkPixbufDestroyNotify)g_free,
+                                                NULL);
+
     if(!pixbuf)
     {
         g_print("Erro ao carregar a imagem\n");
         exit(EXIT_FAILURE);
     }
 
-    GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
+    GdkTexture *texture = gdk_texture_new_for_pixbuf(pixbuf);
     g_object_unref(pixbuf);
+
+    GtkWidget *resultado = gtk_image_new_from_paintable(GDK_PAINTABLE(texture));
+    g_object_unref(texture);
 
     Dimensoes imagem = calculaTela(atual->img->dim);
 
@@ -1338,22 +1373,45 @@ void exibirImagemGray(Historico_Gray *atual)
         gtk_grid_remove(GTK_GRID(grid), imagemAtual);
 
     imagemAtual = resultado;
+    
     gtk_widget_set_size_request(resultado, imagem.largura, imagem.altura);
     gtk_grid_attach(GTK_GRID(grid), resultado, 4, 0, 16, 16);
 }
 
 void exibirImagemRGB(Historico_RGB *atual)
 {
-    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(atual->png, NULL);
-    
+    int altura = atual->img->dim.altura;
+    int largura = atual->img->dim.largura;
+
+    guchar *pixels = alocarGuchar(altura * largura * 3);
+    for (int i = 0; i < altura * largura; i++)
+    {
+            pixels[i * 3] = (guchar) atual->img->pixels[i].red;
+            pixels[i * 3 + 1] = (guchar) atual->img->pixels[i].green;
+            pixels[i * 3 + 2] = (guchar) atual->img->pixels[i].blue;
+    }
+
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_data(pixels,
+                                                GDK_COLORSPACE_RGB,
+                                                FALSE,
+                                                8,
+                                                largura,
+                                                altura,
+                                                largura * 3,
+                                                (GdkPixbufDestroyNotify)g_free,
+                                                NULL);
+
     if(!pixbuf)
     {
         g_print("Erro ao carregar a imagem\n");
         exit(EXIT_FAILURE);
     }
 
-    GtkWidget *resultado = gtk_image_new_from_pixbuf(pixbuf);
+    GdkTexture *texture = gdk_texture_new_for_pixbuf(pixbuf);
     g_object_unref(pixbuf);
+
+    GtkWidget *resultado = gtk_image_new_from_paintable(GDK_PAINTABLE(texture));
+    g_object_unref(texture);
 
     Dimensoes imagem = calculaTela(atual->img->dim);
 
@@ -1361,6 +1419,7 @@ void exibirImagemRGB(Historico_RGB *atual)
         gtk_grid_remove(GTK_GRID(grid), imagemAtual);
 
     imagemAtual = resultado;
+    
     gtk_widget_set_size_request(resultado, imagem.largura, imagem.altura);
     gtk_grid_attach(GTK_GRID(grid), resultado, 4, 0, 16, 16);
 }
@@ -1379,7 +1438,6 @@ Historico_Gray *criar_No_gray(){
         exit(EXIT_FAILURE);
     }
 
-    no->png = NULL;
     no->prox = NULL;
     no->ant = NULL;
 
@@ -1450,7 +1508,6 @@ void free_Historico_gray(Historico_Gray *l){
         l = l->prox;
         free_image_gray(aux->img);
         aux->nome = liberarVetor(aux->nome);
-        aux->png = liberarVetor(aux->png);
         free(aux);
     }
 }
@@ -1468,7 +1525,6 @@ Historico_RGB *criar_No_rgb(){
         exit(EXIT_FAILURE);
     }
 
-    no->png = NULL;
     no->prox = NULL;
     no->ant = NULL;
 
@@ -1539,7 +1595,6 @@ void free_Historico_rgb(Historico_RGB *l){
         l = l->prox;
         free_image_rgb(aux->img);
         aux->nome = liberarVetor(aux->nome);
-        aux->png = liberarVetor(aux->png);
         free(aux);
     }
 }
@@ -1554,9 +1609,6 @@ void salvar_gray(ImageGray *image, char *pasta, char *nome){
     char *png = gerarCaminho(caminho, ".", "png");
 
     salvarImagemGray(image, pasta, txt, png);
-    historyGray->png = png;
-    exibirImagemGray(historyGray);
-    
     g_print("Imagem salva com sucesso...\n");
 
     caminho = liberarVetor(caminho);
@@ -1566,7 +1618,7 @@ void salvar_gray(ImageGray *image, char *pasta, char *nome){
 void salvarTudo_gray(Historico_Gray *l, char *pasta){
     Historico_Gray *aux = l;
 
-    while(aux->ant->ant != NULL)
+    while(aux->ant != NULL)
         aux = aux->ant;
 
     while(aux != NULL){
@@ -1585,9 +1637,6 @@ void salvar_rgb(ImageRGB *image, char *pasta, char *nome){
     char *png = gerarCaminho(caminho, ".", "png");
 
     salvarImagemRGB(image, pasta, txt, png);
-    historyRGB->png = png;
-    exibirImagemRGB(historyRGB);
-    
     g_print("Imagem salva com sucesso...\n");
 
     caminho = liberarVetor(caminho);
@@ -1597,7 +1646,7 @@ void salvar_rgb(ImageRGB *image, char *pasta, char *nome){
 void salvarTudo_rgb(Historico_RGB *l, char *pasta){
     Historico_RGB *aux = l;
 
-    while(aux->ant->ant != NULL)
+    while(aux->ant != NULL)
         aux = aux->ant;
 
     while(aux != NULL){
@@ -1779,7 +1828,7 @@ void Executar_Gray(GtkWidget *widget, gpointer data)
 
                 historyGray = edicoesGray(historyGray, aux2);
                 if(historyGray != NULL)
-                    salvar_gray(historyGray->img, pastaOriginal, historyGray->nome);
+                    exibirImagemGray(historyGray);    
             }
         }
 
@@ -1798,6 +1847,11 @@ void Executar_Gray(GtkWidget *widget, gpointer data)
                 case SALVAR:
                     g_print("Salvando imagem \"%s\"...\n\n", historyGray->nome);
                     salvar_gray(historyGray->img, pastaOriginal, historyGray->nome);
+                    break;
+
+                case SALVARTODOS:
+                    g_print("Salvando imagem \"%s\"...\n\n", historyGray->nome);
+                    salvarTudo_gray(historyGray, pastaOriginal);
                     break;
 
                 case SAIR:
@@ -1837,7 +1891,7 @@ void Executar_RGB(GtkWidget *widget, gpointer data)
 
                 historyRGB = edicoesRGB(historyRGB, aux2);
                 if(historyRGB != NULL)
-                    salvar_rgb(historyRGB->img, pastaOriginal, historyRGB->nome);
+                    exibirImagemRGB(historyRGB);    
             }
         }
 
@@ -1856,6 +1910,11 @@ void Executar_RGB(GtkWidget *widget, gpointer data)
                 case SALVAR:
                     g_print("Salvando imagem \"%s\"...\n\n", historyRGB->nome);
                     salvar_rgb(historyRGB->img, pastaOriginal, historyRGB->nome);
+                    break;
+
+                case SALVARTODOS:
+                    g_print("Salvando imagem \"%s\"...\n\n", historyRGB->nome);
+                    salvarTudo_rgb(historyRGB, pastaOriginal);
                     break;
 
                 case SAIR:
@@ -1931,7 +1990,6 @@ void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
 
         historyGray = criar_lista_gray();
         historyGray = add_historico_gray(image, historyGray, nome); //adiciona a imagem original na cabeça da lista
-        salvar_gray(image, pastaOriginal, nome);
         
         g_print("Imagem: \"%s\" foi adicionada\n\n", historyGray->nome);
 
@@ -1956,6 +2014,7 @@ void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
         criarBotaoGray("Imagem Anterior", 0, ANTERIOR+1, 1, 1, ANTERIOR);
         criarBotaoGray("Imagem Seguinte", 1, ANTERIOR+1, 1, 1, PROXIMO);
         criarBotaoGray("Salvar", 0, SALVAR, 1, 1, SALVAR);
+        criarBotaoGray("Salvar Tudo", 1, SALVAR, 1, 1, SALVARTODOS);
 
         GtkWidget *entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Tamanho: ");
@@ -1981,7 +2040,7 @@ void janelaGray(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Quantidade: ");
         g_signal_connect(entrada, "changed", G_CALLBACK(numeroDigitado), &randomGlobal);
         gtk_grid_attach(GTK_GRID(grid), entrada, 1, ALEATORIO+1, 1, 1);
-
+     
         exibirImagemGray(historyGray);
     }
     else
@@ -2036,7 +2095,6 @@ void janelaRGB(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
     
         historyRGB = criar_lista_rgb();
         historyRGB = add_historico_rgb(image, historyRGB, nome); //adiciona a imagem original na cabeça da lista
-        salvar_rgb(image, pastaOriginal, nome);
         
         g_print("Imagem: \"%s\" foi adicionada\n\n", historyRGB->nome);
 
@@ -2061,6 +2119,7 @@ void janelaRGB(GtkFileDialog *dialog, GAsyncResult *res, gpointer window)
         criarBotaoRGB("Imagem Anterior", 0, ANTERIOR+1, 1, 1, ANTERIOR);
         criarBotaoRGB("Imagem Seguinte", 1, ANTERIOR+1, 1, 1, PROXIMO);
         criarBotaoRGB("Salvar", 0, SALVAR, 1, 1, SALVAR);
+        criarBotaoRGB("Salvar Tudo", 1, SALVAR, 1, 1, SALVARTODOS);
 
         GtkWidget *entrada = gtk_entry_new();
         gtk_entry_set_placeholder_text(GTK_ENTRY(entrada), "Tamanho: ");
@@ -2133,7 +2192,7 @@ static void activate(GtkApplication *app, gpointer user_data)
     button = gtk_button_new_with_label("Sair");
     g_signal_connect(button, "clicked", G_CALLBACK(Executar_Gray), &funcoes[SAIR]);
     g_signal_connect_swapped(button, "clicked", G_CALLBACK(gtk_window_destroy), window);
-    gtk_grid_attach(GTK_GRID(grid), button, 0, SAIR, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button, 0, SAIR-1, 1, 1);
 
     gtk_window_present(GTK_WINDOW(window));
 }
